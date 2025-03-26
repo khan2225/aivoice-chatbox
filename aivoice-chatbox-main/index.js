@@ -31,7 +31,7 @@ const SYSTEM_MESSAGE =
     Keep responses short (1-2 sentences max), avoiding unnecessary elaboration. \
     Focus on getting the scammer’s company name, offer details, and payment method. \
     Do NOT provide long explanations. Stick to simple, engaging responses.\
-    Log key details under 'scammerName' (scammer's company), 'scammerDeal' (their offered deal),       and 'specialNotes' (any payment requests, contact info, or threats used). \
+    Log key details under 'scammerName' (scammer's company), 'scammerDeal' (their offered deal), and 'specialNotes' (any payment requests, contact info, or threats used). \
     Act confused and curious, but always stay in character.";
 
 // Serve the HTML file
@@ -69,7 +69,7 @@ fastify.all("/incoming-call", async (request, reply) => {
                           <Response>
                               <Say voice ="Polly.Joanna-Neural">Hello! Thank you for reaching out. I'm very interested in what you have to offer. Can you tell me more details?</Say>
                               <Connect>
-                                  <Stream url="wss://${request.headers.host}/media-stream" />
+                                  <Stream url="ws://${request.headers.host}/media-stream" />
                               </Connect>
                           </Response>`;
 
@@ -373,10 +373,10 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
                     //Add full transcript to the payload
                     parsedContent.fullTranscript = transcript;
 
-                    // Send the parsed content + full transcript directly                        to the webhook
+                    // Send the parsed content + full transcript directly to the webhook
                     await sendToWebhook(parsedContent);
                     console.log(
-                        "Extracted and sent scammer details & full                                 transcript:",
+                        "Extracted and sent scammer details & full transcript:",
                         parsedContent,
                     );
                 } else {
