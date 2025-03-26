@@ -69,7 +69,7 @@ fastify.all("/incoming-call", async (request, reply) => {
                           <Response>
                               <Say voice ="Polly.Joanna-Neural">Hello! Thank you for reaching out. I'm very interested in what you have to offer. Can you tell me more details?</Say>
                               <Connect>
-                                  <Stream url="wss://${request.headers.host}/media-stream" />
+                                  <Stream url="ws://${request.headers.host}/media-stream" />
                               </Connect>
                           </Response>`;
 
