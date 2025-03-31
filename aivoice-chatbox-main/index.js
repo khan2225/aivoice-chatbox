@@ -62,25 +62,19 @@ fastify.get("/", async (request, reply) => {
 });
 
 // Route for Twilio to handle incoming and outgoing calls
-fastify.all("/incoming-call", async (request, reply) => {
-    console.log("Incoming call");
+fastify.all('/incoming-call', async (request, reply) => {
+    console.log('Incoming call');
 
-    console.log("Sending TwiML to Twilio:", twimlResponse);
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+                          <Response>
+                              <Say>Hi, you have called Bart's Automative Centre. How can we help?</Say>
+                              <Connect>
+                                  <Stream url="wss://${request.headers.host}/media-stream" />
+                              </Connect>
+                          </Response>`;
 
-<Response>
-  <Say voice="Polly.Joanna-Neural">
-    Hello! Thank you for reaching out. I'm very interested in what you have to offer. Can you tell me more details?
-  </Say>
-  <Connect>
-    <Stream url="wss://${request.headers.host}/media-stream" track="inbound" audioFormat="mulaw" />
-  </Connect>
-</Response>`;
-
-
-    reply.type("text/xml").send(twimlResponse);
+    reply.type('text/xml').send(twimlResponse);
 });
-
 // WebSocket route for media-stream
 fastify.register(async (fastify) => {
     fastify.get("/media-stream", { websocket: true }, (connection, req) => {
