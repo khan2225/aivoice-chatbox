@@ -69,7 +69,7 @@ fastify.all("/incoming-call", async (request, reply) => {
                           <Response>
                               <Say voice ="Polly.Joanna-Neural">Hello! Thank you for reaching out. I'm very interested in what you have to offer. Can you tell me more details?</Say>
                               <Connect>
-                                  <Stream url="wss://${request.headers.host}/media-stream" track="inbound" audioFormat="pcm" />
+                                  <Stream url="wss://${request.headers.host}/media-stream" track="inbound" audioFormat="mulaw" />
                                   </Connect>
                           </Response>`;
 
@@ -104,7 +104,7 @@ fastify.register(async (fastify) => {
                 type: "session.update",
                 session: {
                     turn_detection: { type: "server_vad" },
-                    input_audio_format: "pcm16",
+                    input_audio_format: "g711_ulaw",
                     output_audio_format: "g711_ulaw",
                     voice: VOICE,
                     instructions: SYSTEM_MESSAGE,
@@ -203,6 +203,7 @@ fastify.register(async (fastify) => {
                             };
 
                             openAiWs.send(JSON.stringify(audioAppend));
+                            console.log(`[Twilio AUDIO] Got audio for stream ${session.streamSid}`);
                         }
                         break;
                     case "start":
