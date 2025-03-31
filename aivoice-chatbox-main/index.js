@@ -65,13 +65,18 @@ fastify.get("/", async (request, reply) => {
 fastify.all("/incoming-call", async (request, reply) => {
     console.log("Incoming call");
 
+    console.log("Sending TwiML to Twilio:", twimlResponse);
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
-                          <Response>
-                              <Say voice ="Polly.Joanna-Neural">Hello! Thank you for reaching out. I'm very interested in what you have to offer. Can you tell me more details?</Say>
-                              <Connect>
-                                  <Stream url="wss://${request.headers.host}/media-stream" track="inbound" audioFormat="mulaw" />
-                                  </Connect>
-                          </Response>`;
+
+<Response>
+  <Say voice="Polly.Joanna-Neural">
+    Hello! Thank you for reaching out. I'm very interested in what you have to offer. Can you tell me more details?
+  </Say>
+  <Connect>
+    <Stream url="wss://${request.headers.host}/media-stream" track="inbound" audioFormat="mulaw" />
+  </Connect>
+</Response>`;
+
 
     reply.type("text/xml").send(twimlResponse);
 });
