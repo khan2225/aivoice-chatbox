@@ -69,7 +69,9 @@ fastify.all('/incoming-call', async (request, reply) => {
                           <Response>
                               <Say>Hi, thanks for reaching out. I'm very interested in what you have to offer.</Say>
                               <Connect>
-                                  <Stream url="wss://${request.headers.host}/media-stream" />
+                                  <Stream url="wss://${request.headers.host}/media-stream" >
+                                  <Parameter name="codec" value="PCMU" />
+                                  </Stream>
                               </Connect>
                           </Response>`;
 
