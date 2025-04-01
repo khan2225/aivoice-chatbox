@@ -90,16 +90,16 @@ fastify.register(async (fastify) => {
         };
         sessions.set(sessionId, session);
 
-        const sessionParams = new URLSearchParams({
-            voice: VOICE,
-            input_audio_format: "g711_ulaw",
-            output_audio_format: "g711_ulaw",
-            instructions: SYSTEM_MESSAGE,
-            "turn_detection.type": "server_vad",
-            "input_audio_transcription.model": "whisper-1",
-            temperature: "0.8",
-            max_output_tokens: "50",
-        });
+        const sessionParams = new URLSearchParams();
+            sessionParams.set("voice", VOICE);
+            sessionParams.set("input_audio_format", "g711_ulaw");
+            sessionParams.set("output_audio_format", "g711_ulaw");
+            sessionParams.set("instructions", SYSTEM_MESSAGE);
+            sessionParams.set("turn_detection.type", "server_vad");
+            sessionParams.set("input_audio_transcription.model", "whisper-1");
+            sessionParams.set("temperature", "0.8");
+            sessionParams.set("max_output_tokens", "50");
+        
         const openAiWs = new WebSocket(
             `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01&${sessionParams.toString()}`,
             {
