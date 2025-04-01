@@ -90,8 +90,18 @@ fastify.register(async (fastify) => {
         };
         sessions.set(sessionId, session);
 
+        const sessionParams = new URLSearchParams({
+            voice: VOICE,
+            input_audio_format: "g711_ulaw",
+            output_audio_format: "g711_ulaw",
+            instructions: SYSTEM_MESSAGE,
+            "turn_detection.type": "server_vad",
+            "input_audio_transcription.model": "whisper-1",
+            temperature: "0.8",
+            max_output_tokens: "50",
+        });
         const openAiWs = new WebSocket(
-            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01&voice=alloy&input_audio_format=g711_ulaw&output_audio_format=g711_ulaw&instructions=" + encodeURIComponent(SYSTEM_MESSAGE),
+            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01&${sessionParams.toString()}`,
             {
                 headers: {
                     Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -128,7 +138,7 @@ fastify.register(async (fastify) => {
         // Open event for OpenAI WebSocket
         openAiWs.on("open", () => {
             console.log("Connected to the OpenAI Realtime API");
-            setTimeout(sendSessionUpdate, 250);
+            //setTimeout(sendSessionUpdate, 250);
         });
 
         // Listen for messages from the OpenAI WebSocket
