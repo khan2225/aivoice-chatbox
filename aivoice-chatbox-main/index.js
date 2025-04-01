@@ -101,7 +101,7 @@ fastify.register(async (fastify) => {
             max_output_tokens: "50",
         });
         const openAiWs = new WebSocket(
-            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01&${sessionParams.toString()}`,
+            `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01&${sessionParams.toString()}`,
             {
                 headers: {
                     Authorization: `Bearer ${OPENAI_API_KEY}`,
