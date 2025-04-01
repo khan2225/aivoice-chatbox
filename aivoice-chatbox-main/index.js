@@ -89,20 +89,9 @@ fastify.register(async (fastify) => {
             streamSid: null,
         };
         sessions.set(sessionId, session);
-
-        const sessionParams = new URLSearchParams();
-            sessionParams.set("voice", VOICE);
-            sessionParams.set("input_audio_format", "g711_ulaw");
-            sessionParams.set("output_audio_format", "g711_ulaw");
-            sessionParams.set("instructions", SYSTEM_MESSAGE);
-            sessionParams.set("turn_detection.type", "server_vad");
-            sessionParams.set("input_audio_transcription.model", "whisper-1");
-            sessionParams.set("temperature", "0.8");
-            sessionParams.set("max_output_tokens", "50");
         
         const openAiWs = new WebSocket(
-            `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01&${sessionParams.toString()}`,
-            {
+            `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01`, {
                 headers: {
                     Authorization: `Bearer ${OPENAI_API_KEY}`,
                     "OpenAI-Beta": "realtime=v1",
