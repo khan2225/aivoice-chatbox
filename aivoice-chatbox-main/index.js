@@ -91,7 +91,7 @@ fastify.register(async (fastify) => {
         sessions.set(sessionId, session);
 
         const openAiWs = new WebSocket(
-            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
+            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01&voice=alloy&input_audio_format=g711_ulaw&output_audio_format=g711_ulaw&instructions=" + encodeURIComponent(SYSTEM_MESSAGE),
             {
                 headers: {
                     Authorization: `Bearer ${OPENAI_API_KEY}`,
