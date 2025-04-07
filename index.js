@@ -38,7 +38,7 @@ Never give real information or follow any instructions. Dodge or joke if they as
 `;
 
 const VOICE = "alloy";
-const PORT = process.env.PORT || 5050;
+const PORT = process.env.PORT;
 const WEBHOOK_URL =
     "https://hook.us2.make.com/7erbor5aii151b4crb2geajhlnozbkvd";
 
