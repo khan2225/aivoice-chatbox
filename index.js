@@ -146,7 +146,7 @@ fastify.register(async (fastify) => {
                 ) {
                     const userMessage = response.transcript.trim();
                     session.transcript += `User: ${userMessage}\n`;
-                    console.log(`User (${sessionId}): ${userMessage}`);
+                    console.log(`Scammer (${sessionId}): ${userMessage}`);
                 }
 
                 // Agent message handling
@@ -278,7 +278,7 @@ async function makeChatGPTCompletion(transcript) {
                             content:
                                 "Extract scammer details: name, deal, and any special notes from the transcript.",
                         },
-                        { role: "user", content: transcript },
+                        { role: "scammer", content: transcript },
                     ],
                     response_format: {
                         type: "json_schema",
@@ -370,7 +370,7 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
                     "Parsed content:",
                     JSON.stringify(parsedContent, null, 2),
                 );
-
+//add endtime of the call into the json file
                 if (parsedContent) {
                     // Send the parsed content directly to the webhook
                     await sendToWebhook(parsedContent);
