@@ -146,7 +146,7 @@ fastify.register(async (fastify) => {
                 ) {
                     const userMessage = response.transcript.trim();
                     session.transcript += `User: ${userMessage}\n`;
-                    console.log(`Scammer (${sessionId}): ${userMessage}`);
+                    console.log(`User (${sessionId}): ${userMessage}`);
                 }
 
                 // Agent message handling
@@ -278,7 +278,7 @@ async function makeChatGPTCompletion(transcript) {
                             content:
                                 "Extract scammer details: name, deal, and any special notes from the transcript.",
                         },
-                        { role: "scammer", content: transcript },
+                        { role: "user", content: transcript },
                     ],
                     response_format: {
                         type: "json_schema",
@@ -396,3 +396,6 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
         console.error("Error in processTranscriptAndSend:", error);
     }
 }
+
+
+//run a secondary parse on the transcript so the agent: message not found isn't printing. 
