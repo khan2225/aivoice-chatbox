@@ -356,6 +356,10 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
             JSON.stringify(result, null, 2),
         );
 
+        const returnData = result.choices[0].message.content;
+
+        console.log(`This is the contained data ${returnData}`);
+
         if (
             result.choices &&
             result.choices[0] &&
