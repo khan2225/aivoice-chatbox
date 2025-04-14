@@ -1,0 +1,17 @@
+import { PERSONAS } from "../config/variables.js";
+
+ // Route for Twilio to handle incoming and outgoing calls
+export function handleIncomingCall(fastify){
+    fastify.all("/incoming-call", async (request, reply) => {
+        console.log("Incoming call");
+        const persona = request.query.persona || "genZ"; //fallback to genz
+        const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+                              <Response>
+                                  <Connect>
+                                      <Stream url="wss://${request.headers.host}/media-stream?persona=${persona}" />
+                                  </Connect>
+                              </Response>`;
+    
+        reply.type("text/xml").send(twimlResponse);
+    });
+}
