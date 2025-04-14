@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import { sendToWebhook } from "./webhook";
+import { sendToWebhook } from "./webhook.js";
 import { MODEL_NAME, RESPONSE_SCHEMA } from "../config/variables.js";
 import { sessions, setCallEnd, formatTranscript } from "../utils/sessions.js";
 
