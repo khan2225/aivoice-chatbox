@@ -9,7 +9,7 @@ import { registerMediaStream } from "./routes/media-stream.js";
 // Load environment variables from .env file
 dotenv.config();
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 8080;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 if (!OPENAI_API_KEY) {
