@@ -7,7 +7,10 @@ dotenv.config();
 export function handleIncomingCall(fastify){
     fastify.all("/incoming-call", async (request, reply) => {
         console.log("Incoming call");
+
         const persona = request.query.persona || "genZ"; //fallback to genz
+        const host = process.env.PUBLIC_HOST || request.headers.host;
+
         const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                               <Response>
                                   <Connect>
