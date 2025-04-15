@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 8080
 
 # Start the server
-CMD ["sh", "-c", "sleep 3 && node index.js"]
+CMD [ "node", "index.js"]
