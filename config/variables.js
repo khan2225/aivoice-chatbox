@@ -1,5 +1,5 @@
 //Personas to use
-const PERSONAS = {
+export const PERSONAS = {
     genZ: {
         systemMessage: `
         You are a curious Gen Z teen who just got a random phone call about a deal, refund, or virus.
@@ -69,7 +69,7 @@ Never give out real info. Act confused, hungry, and slightly scared but friendly
 
 
 // List of Event Types to log to the console
-const LOG_EVENT_TYPES = [
+export const LOG_EVENT_TYPES = [
     "response.content.done",
     "rate_limits.updated",
     "response.done",
@@ -81,7 +81,19 @@ const LOG_EVENT_TYPES = [
     "conversation.item.input_audio_transcription.completed",
 ];
 
-const MODEL_NAME = "gpt-4o-2024-08-06";
+
+export const MODEL_NAME = "gpt-4o-2024-08-06";
+
+export const RESPONSE_SCHEMA = {
+    type: "object",
+  properties: {
+    scammerName: { type: "string" },
+    scammerDeal: { type: "string" },
+    specialNotes: { type: "string" },
+    fullTranscript: { type: "string"}
+  },
+  required: ["scammerName", "scammerDeal", "specialNotes", "fullTranscript"]
+}
 
 
 

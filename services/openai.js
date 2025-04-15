@@ -28,7 +28,7 @@ export async function makeChatGPTCompletion(transcript) {
                             `3. specialNotes (string).\n` +
                             `Return the result as a JSON object matching this schema:\n${JSON.stringify(RESPONSE_SCHEMA)}`,
                     },
-                    { role: "user", content: transcript },
+                    { role: "scammer", content: transcript },
                 ],
                 temperature: 0.3,
             }),
