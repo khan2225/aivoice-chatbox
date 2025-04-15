@@ -5,38 +5,34 @@ import { sessions, setCallEnd, formatTranscript } from "../utils/sessions.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Function to make ChatGPT API completion call with structured outputs
+// Function to call ChatGPT API with transcript and request scammer detail extraction
 export async function makeChatGPTCompletion(transcript) {
     console.log("Starting ChatGPT API call...");
 
     try {
-        const response = await fetch(
-            "https://api.openai.com/v1/chat/completions",
-            {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    model: MODEL_NAME,
-                    messages: [
-                        {
-                            role: "system",
-                            content: "Extract scammer details: name, deal, and any special notes from the transcript.",
-                        },
-                        { role: "user", content: transcript },
-                    ],
-                    response_format: {
-                        type: "json_schema",
-                        json_schema: {
-                            name: "scammer_details_extraction",
-                            schema: RESPONSE_SCHEMA,
-                        },
-                    },
-                }),
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                "Content-Type": "application/json",
             },
-        );
+            body: JSON.stringify({
+                model: MODEL_NAME,
+                messages: [
+                    {
+                        role: "system",
+                        content:
+                            `Extract the following fields from the transcript:\n` +
+                            `1. scammerName (string)\n` +
+                            `2. scammerDeal (string)\n` +
+                            `3. specialNotes (string).\n` +
+                            `Return the result as a JSON object matching this schema:\n${JSON.stringify(RESPONSE_SCHEMA)}`,
+                    },
+                    { role: "user", content: transcript },
+                ],
+                temperature: 0.3,
+            }),
+        });
 
         console.log("ChatGPT API response status:", response.status);
         const data = await response.json();
@@ -48,34 +44,47 @@ export async function makeChatGPTCompletion(transcript) {
     }
 }
 
-// Main function to extract and send customer details
+// Main handler to process transcript, extract scammer info, and send to webhook
 export async function processTranscriptAndSend(transcript, sessionId = null) {
     console.log(`Starting transcript processing for session ${sessionId}...`);
+
     try {
         const result = await makeChatGPTCompletion(transcript);
+        const rawContent = result.choices?.[0]?.message?.content;
 
-        const returnData = result.choices?.[0]?.message?.content;
-
-        if (!returnData) {
-            console.error("Unexpected response structure from ChatGPT API");
+        if (!rawContent) {
+            console.error("Missing message content in ChatGPT response");
             return;
         }
 
-        const scamDetails = JSON.parse(returnData);
+        let scamDetails;
+        try {
+            scamDetails = JSON.parse(rawContent);
+        } catch (err) {
+            console.error("Failed to parse scammer details from JSON:", err);
+            return;
+        }
+
         console.log("Parsed scammer details:", scamDetails);
 
-        const session = sessions.get(sessionId);
+        const session = sessionId ? sessions.get(sessionId) : null;
+        if (!session) {
+            console.warn(`No session found for sessionId: ${sessionId}`);
+            return;
+        }
+
         setCallEnd(sessionId);
         const formattedTranscript = formatTranscript(session.transcript);
 
         const finalPayload = {
-            ...scamDetails,
-            fullTranscript: formattedTranscript,
+            sessionId,
+            user: session.user || "test-user",
             personaKey: session.persona,
             callStart: session.callStart,
             callEnd: session.callEnd,
-            deletedAt: session.deletedAt,
-            user: session.user || "test-user"
+            deletedAt: session.deletedAt || null,
+            fullTranscript: formattedTranscript,
+            ...scamDetails,
         };
 
         await sendToWebhook(finalPayload);
