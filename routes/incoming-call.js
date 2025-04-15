@@ -19,7 +19,7 @@ export function handleIncomingCall(fastify) {
         const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                               <Response>
                                   <Connect>
-                                      <Stream url="wss://${domain}/media-stream?persona=${personaKey}" />
+                                      <Stream url=<Stream url="wss://aivoice-chatbox-185231488037.us-central1.run.app/media-stream?persona=genZ" />
                                   </Connect>
                               </Response>`;
     
