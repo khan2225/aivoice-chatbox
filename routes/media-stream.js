@@ -11,7 +11,7 @@ import { processTranscriptAndSend } from "../services/openai.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-// routes/media-stream.js
+/*// routes/media-stream.js
 export function registerMediaStream(fastify) {
     fastify.get("/media-stream", { websocket: true }, (connection, req) => {
       console.log("✅ /media-stream: WebSocket connected.");
@@ -34,10 +34,10 @@ export function registerMediaStream(fastify) {
     });
   }
   
-  
+  */
   
 
-   /* const personaKey = req.query.persona || "genZ";
+    const personaKey = req.query.persona || "genZ";
     const selectedPersona = PERSONAS[personaKey] || PERSONAS.genZ;
 
     console.log("🧠 Persona Key:", personaKey);
@@ -178,6 +178,6 @@ export function registerMediaStream(fastify) {
 
     openAiWs.on("error", (err) => {
       console.error("🧨 WebSocket error from OpenAI:", err);
-    });*/
+    });
  // }); 
 //}

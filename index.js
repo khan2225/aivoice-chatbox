@@ -28,8 +28,8 @@ const fastify = Fastify();
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
-//registerWsTestRoute(fastify);        // /ws-test
-//handleIncomingCall(fastify);         // /incoming-call
+registerWsTestRoute(fastify);        // /ws-test
+handleIncomingCall(fastify);         // /incoming-call
 registerMediaStream(fastify);
 
 /*// ✅ Inline media-stream route for testing
