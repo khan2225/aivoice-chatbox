@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 export const sessions = new Map();
 
 export function getOrCreateSession(sessionId, persona = "genZ") {

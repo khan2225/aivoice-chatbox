@@ -1,4 +1,7 @@
 import { PERSONAS } from "../config/variables.js";
+import dotenv from "dotenv";
+dotenv.config();
+
 
  // Route for Twilio to handle incoming and outgoing calls
 export function handleIncomingCall(fastify){

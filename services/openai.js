@@ -2,6 +2,8 @@ import fetch from "node-fetch";
 import { sendToWebhook } from "./webhook.js";
 import { MODEL_NAME, RESPONSE_SCHEMA } from "../config/variables.js";
 import { sessions, setCallEnd, formatTranscript } from "../utils/sessions.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 // Function to make ChatGPT API completion call with structured outputs
 export async function makeChatGPTCompletion(transcript) {

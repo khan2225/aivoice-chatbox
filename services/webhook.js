@@ -1,5 +1,7 @@
 import fetch from "node-fetch";
 import { WEBHOOK_URL } from "../config/variables.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 // Function to send data to Make.com webhook
 export async function sendToWebhook(payload){

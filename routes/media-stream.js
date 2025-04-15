@@ -2,6 +2,9 @@ import WebSocket from "ws";
 import { PERSONAS, LOG_EVENT_TYPES } from "../config/variables.js";
 import { getOrCreateSession, deleteSession, setCallEnd, formatTranscript } from "../utils/sessions.js";
 import { processTranscriptAndSend } from "../services/openai.js";
+import dotenv from "dotenv";
+dotenv.config();
+
 
 // WebSocket route for media-stream
 export function registerMediaStream(fastify) {
