@@ -95,5 +95,7 @@ export const RESPONSE_SCHEMA = {
   required: ["scammerName", "scammerDeal", "specialNotes", "fullTranscript"]
 }
 
+export const WEBHOOK_URL = "https://hook.us2.make.com/7erbor5aii151b4crb2geajhlnozbkvd"; 
+
 
 
