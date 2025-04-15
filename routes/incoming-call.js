@@ -1,4 +1,3 @@
-// routes/media-stream.js
 import { PERSONAS } from "../config/variables.js"; // Correct path
 import dotenv from "dotenv";
 dotenv.config();
@@ -15,11 +14,11 @@ export function handleIncomingCall(fastify) {
         const host = process.env.PUBLIC_HOST || request.headers.host;
         const domain = process.env.DOMAIN || request.headers.host;
 
-        // You can now use `selectedPersona` in your logic if needed
+        // Properly formatted TwiML response with dynamic persona selection
         const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                               <Response>
                                   <Connect>
-                                      <Stream url=<Stream url="wss://aivoice-chatbox-185231488037.us-central1.run.app/media-stream?persona=genZ" />
+                                      <Stream url="wss://${domain}/media-stream?persona=${personaKey}" />
                                   </Connect>
                               </Response>`;
     
