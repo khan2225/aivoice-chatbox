@@ -11,12 +11,38 @@ import { processTranscriptAndSend } from "../services/openai.js";
 import dotenv from "dotenv";
 dotenv.config();
 
+// routes/media-stream.js
 export function registerMediaStream(fastify) {
-  fastify.get("/media-stream", { websocket: true }, (connection, req) => {
-    console.log("🔌 Client connected to /media-stream");
+    fastify.get("/media-stream", { websocket: true }, (connection, req) => {
+      console.log("✅ /media-stream: WebSocket connected.");
+  
+      connection.socket.on("message", (msg) => {
+        try {
+          const message = msg.toString();
+          console.log("📨 Received message from client:", message);
+  
+          connection.socket.send(`👋 Echo: ${message}`);
+          console.log("✅ Sent echo back to client.");
+        } catch (err) {
+          console.error("❌ Error handling message:", err);
+        }
+      });
+  
+      connection.socket.on("close", () => {
+        console.log("❎ Client disconnected from /media-stream.");
+      });
+    });
+  }
+  
+  
+  
 
-    const personaKey = req.query.persona || "genZ";
+   /* const personaKey = req.query.persona || "genZ";
     const selectedPersona = PERSONAS[personaKey] || PERSONAS.genZ;
+
+    console.log("🧠 Persona Key:", personaKey);
+    console.log("🧠 Selected Persona:", selectedPersona);
+
     const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
     const model = req.query.model || "gpt-4o-realtime-preview-2024-10-01";
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -27,17 +53,24 @@ export function registerMediaStream(fastify) {
       return;
     }
 
+    if (!selectedPersona?.voice || !selectedPersona?.systemMessage) {
+      console.error("❌ Missing voice or systemMessage for persona:", personaKey);
+      connection.socket.close();
+      return;
+    }
+
     const session = getOrCreateSession(sessionId, personaKey);
     session.callStart = new Date().toISOString();
     session.persona = personaKey;
     console.log("📞 Session initialized:", { sessionId, personaKey });
 
-    const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=${model}`, {
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "OpenAI-Beta": "realtime=v1",
-      },
-    });
+    const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=${model}`,
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "OpenAI-Beta": "realtime=v1",
+        },
+      });
 
     const sendSessionUpdate = () => {
       const sessionUpdate = {
@@ -145,6 +178,6 @@ export function registerMediaStream(fastify) {
 
     openAiWs.on("error", (err) => {
       console.error("🧨 WebSocket error from OpenAI:", err);
-    });
-  });
-}
+    });*/
+ // }); 
+//}

@@ -3,13 +3,13 @@ import dotenv from "dotenv";
 import fastifyFormBody from "@fastify/formbody";
 import fastifyWs from "@fastify/websocket";
 import { handleIncomingCall } from "./routes/incoming-call.js";
-// import { registerMediaStream } from "./routes/media-stream.js";
+import { registerMediaStream } from "./routes/media-stream.js";
 import { registerWsTestRoute } from "./routes/ws-test.js";
 
 // Load environment variables from .env file
 dotenv.config();
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 8080;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 if (!OPENAI_API_KEY) {
@@ -28,14 +28,27 @@ const fastify = Fastify();
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
-registerWsTestRoute(fastify);        // /ws-test
-handleIncomingCall(fastify);         // /incoming-call
+//registerWsTestRoute(fastify);        // /ws-test
+//handleIncomingCall(fastify);         // /incoming-call
+registerMediaStream(fastify);
 
-// ✅ Inline media-stream route for testing
+/*// ✅ Inline media-stream route for testing
 fastify.get("/media-stream", { websocket: true }, (connection, req) => {
-  console.log("👀 Testing inline media-stream route");
-  connection.socket.close();
-});
+    console.log("✅ WebSocket connected to /media-stream");
+  
+    connection.socket.on("message", (msg) => {
+      const message = msg.toString();
+      console.log("📨 Received from client:", message);
+      connection.socket.send(`👋 Pong from server: "${message}"`);
+    });
+  
+    connection.socket.on("close", () => {
+      console.log("❎ WebSocket closed");
+    });
+  });
+  
+  */
+  
 
 // Health check route
 fastify.get("/", async (request, reply) => {

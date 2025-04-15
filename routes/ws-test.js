@@ -8,6 +8,8 @@ export function registerWsTestRoute(fastify) {
         connection.socket.send("👋 Hello from server!");
       });
   
+      console.log("✅ /media-stream route was hit by client");
+
       connection.socket.on("close", () => {
         console.log("❎ Client disconnected from /ws-test");
       });
