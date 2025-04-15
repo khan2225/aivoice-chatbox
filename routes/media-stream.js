@@ -1,45 +1,14 @@
-// routes/media-stream.js
 import WebSocket from "ws";
 import { PERSONAS, LOG_EVENT_TYPES } from "../config/variables.js";
-import {
-  getOrCreateSession,
-  deleteSession,
-  setCallEnd,
-  formatTranscript,
-} from "../utils/sessions.js";
+import { getOrCreateSession, deleteSession, setCallEnd, formatTranscript } from "../utils/sessions.js";
 import { processTranscriptAndSend } from "../services/openai.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-/*// routes/media-stream.js
 export function registerMediaStream(fastify) {
-    fastify.get("/media-stream", { websocket: true }, (connection, req) => {
-      console.log("✅ /media-stream: WebSocket connected.");
-  
-      connection.socket.on("message", (msg) => {
-        try {
-          const message = msg.toString();
-          console.log("📨 Received message from client:", message);
-  
-          connection.socket.send(`👋 Echo: ${message}`);
-          console.log("✅ Sent echo back to client.");
-        } catch (err) {
-          console.error("❌ Error handling message:", err);
-        }
-      });
-  
-      connection.socket.on("close", () => {
-        console.log("❎ Client disconnected from /media-stream.");
-      });
-    });
-  }
-  
-  */
-  
-
-    const personaKey = req.query.persona || "genZ";
-    const selectedPersona = PERSONAS[personaKey] || PERSONAS.genZ;
-
+  fastify.get("/media-stream", { websocket: true }, (connection, req) => {
+    const personaKey = req.query.persona || "genZ"; // Default to genZ if no persona is specified
+    const selectedPersona = PERSONAS[personaKey] || PERSONAS.genZ; // Fallback to genZ if the persona is not found
     console.log("🧠 Persona Key:", personaKey);
     console.log("🧠 Selected Persona:", selectedPersona);
 
@@ -50,13 +19,13 @@ export function registerMediaStream(fastify) {
     if (!OPENAI_API_KEY) {
       console.error("❌ OPENAI_API_KEY missing in environment");
       connection.socket.close();
-      return;
+      return; // Return if the API key is missing
     }
 
     if (!selectedPersona?.voice || !selectedPersona?.systemMessage) {
       console.error("❌ Missing voice or systemMessage for persona:", personaKey);
       connection.socket.close();
-      return;
+      return; // Return if persona data is missing
     }
 
     const session = getOrCreateSession(sessionId, personaKey);
@@ -64,13 +33,12 @@ export function registerMediaStream(fastify) {
     session.persona = personaKey;
     console.log("📞 Session initialized:", { sessionId, personaKey });
 
-    const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=${model}`,
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "OpenAI-Beta": "realtime=v1",
-        },
-      });
+    const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=${model}`, {
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "OpenAI-Beta": "realtime=v1",
+      },
+    });
 
     const sendSessionUpdate = () => {
       const sessionUpdate = {
@@ -93,7 +61,7 @@ export function registerMediaStream(fastify) {
 
     openAiWs.on("open", () => {
       console.log("✅ Connected to OpenAI Realtime API");
-      setTimeout(sendSessionUpdate, 300);
+      setTimeout(sendSessionUpdate, 300); // Delay the first session update to ensure WebSocket connection is ready
     });
 
     openAiWs.on("message", (data) => {
@@ -179,5 +147,5 @@ export function registerMediaStream(fastify) {
     openAiWs.on("error", (err) => {
       console.error("🧨 WebSocket error from OpenAI:", err);
     });
- // }); 
-//}
+  });
+}
