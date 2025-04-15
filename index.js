@@ -5,6 +5,7 @@ import fastifyFormBody from "@fastify/formbody";
 import fastifyWs from "@fastify/websocket";
 import { handleIncomingCall } from "./routes/incoming-call.js";
 import { registerMediaStream } from "./routes/media-stream.js";
+import { registerWsTestRoute } from "./routes/ws-test.js";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -21,7 +22,7 @@ if (!OPENAI_API_KEY) {
 const fastify = Fastify();
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
-
+registerWsTestRoute(fastify);
 // Root route
 fastify.get("/", async (request, reply) => {
   reply.send({ message: "Twilio Media Stream Server is running!" });
