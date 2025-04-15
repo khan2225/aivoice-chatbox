@@ -10,11 +10,11 @@ export function handleIncomingCall(fastify){
 
         const persona = request.query.persona || "genZ"; //fallback to genz
         const host = process.env.PUBLIC_HOST || request.headers.host;
-
+        const domain = process.env.DOMAIN || request.headers.host;
         const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                               <Response>
                                   <Connect>
-                                      <Stream url="wss://aivoice-chatbox-185231488037.us-central1.run.app/media-stream?persona=${persona}" />
+                                      <Stream url="wss://${domain}/media-stream?persona=${persona}" />
                                   </Connect>
                               </Response>`;
     
