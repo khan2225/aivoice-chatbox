@@ -22,7 +22,10 @@ if (!OPENAI_API_KEY) {
 const fastify = Fastify();
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
+
 registerWsTestRoute(fastify);
+
+registerMediaStream(fastify);
 // Root route
 fastify.get("/", async (request, reply) => {
   reply.send({ message: "Twilio Media Stream Server is running!" });
@@ -30,7 +33,7 @@ fastify.get("/", async (request, reply) => {
 
 // Register routes
 handleIncomingCall(fastify);
-registerMediaStream(fastify);
+//registerMediaStream(fastify);
 
 // Start server
 fastify.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
