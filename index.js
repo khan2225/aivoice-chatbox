@@ -98,6 +98,7 @@ fastify.get("/", async (_, reply) => {
 });
 
 fastify.all("/incoming-call", async (request, reply) => {
+  console.log("📞 Twilio hit /incoming-call");
   const persona = request.query.persona || "genZ";
   const host = process.env.DOMAIN || request.headers.host;
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
