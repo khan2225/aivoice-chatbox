@@ -1,4 +1,3 @@
-// index.js
 import Fastify from "fastify";
 import dotenv from "dotenv";
 import fastifyFormBody from "@fastify/formbody";
@@ -20,20 +19,20 @@ if (!OPENAI_API_KEY) {
 
 // Initialize Fastify
 const fastify = Fastify();
+
+// Register plugins first
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
-registerWsTestRoute(fastify);
+// Register all routes AFTER websocket plugin
+registerWsTestRoute(fastify);        // /ws-test
+registerMediaStream(fastify);        // /media-stream
+handleIncomingCall(fastify);         // /incoming-call
 
-registerMediaStream(fastify);
-// Root route
+// Optional root route for basic health check
 fastify.get("/", async (request, reply) => {
   reply.send({ message: "Twilio Media Stream Server is running!" });
 });
-
-// Register routes
-handleIncomingCall(fastify);
-//registerMediaStream(fastify);
 
 // Start server
 fastify.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
@@ -41,5 +40,6 @@ fastify.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
     console.error(err);
     process.exit(1);
   }
-  console.log(`Server is listening on port ${PORT}`);
+  console.log(`✅ Server is listening on port ${PORT}`);
 });
+
