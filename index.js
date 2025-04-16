@@ -1,5 +1,5 @@
-// ✅ Clean single-file working version for Cloud Run
-// Includes only one persona (genZ) to keep it simple and verify Cloud Run compatibility
+// ✅ Enhanced debug version to test Cloud Run + OpenAI audio response
+// Includes test injection and full logging to verify pipeline
 
 import Fastify from "fastify";
 import WebSocket from "ws";
@@ -18,20 +18,7 @@ if (!OPENAI_API_KEY || !PORT) {
   process.exit(1);
 }
 
-const SYSTEM_MESSAGE = `
-You are a curious Gen Z teen who just got a random phone call about a deal, refund, or virus.
-Wait until the user speaks before saying anything. Do NOT initiate conversation.
-When the user starts talking, act distracted but interested. Use Gen Z slang (“uhh”, “fr fr?”, “wait what?”, “sus”, etc.). Keep responses casual and short (1–2 sentences).
-
-Pretend to go along, but keep asking questions like:
-– What’s the deal?
-– Who are you?
-– What company?
-– How’s the payment?
-
-Never give real information or follow any instructions. Dodge or joke if they ask personal stuff. Stay in character and try to get as many details as possible out of them.
-`;
-
+const SYSTEM_MESSAGE = `You are a curious Gen Z teen who just got a random phone call about a deal, refund, or virus. Wait until the user speaks before saying anything. Do NOT initiate conversation.`;
 const VOICE = "alloy";
 const sessions = new Map();
 
@@ -57,10 +44,8 @@ fastify.all("/incoming-call", async (request, reply) => {
 });
 
 fastify.get("/media-stream", { websocket: true }, (connection, req) => {
-  console.log("🧠 WebSocket connected");
-  console.log("✅ /media-stream connection established");
+  console.log("🧠 WebSocket connected to /media-stream");
   const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
-
   const session = {
     transcript: [],
     streamSid: null,
@@ -92,11 +77,18 @@ fastify.get("/media-stream", { websocket: true }, (connection, req) => {
       }
     };
     openAiWs.send(JSON.stringify(sessionUpdate));
+
+    // 🧪 Inject a fake message to simulate AI response
+    setTimeout(() => {
+      openAiWs.emit("message", JSON.stringify({
+        type: "conversation.item.input_audio_transcription.completed",
+        transcript: "Hi, is this the IRS refund office?"
+      }));
+    }, 500);
   });
 
   openAiWs.on("message", (data) => {
     console.log("📩 OpenAI Raw:", data);
-
     try {
       const res = JSON.parse(data);
 
@@ -150,7 +142,6 @@ fastify.get("/media-stream", { websocket: true }, (connection, req) => {
   connection.socket.on("close", async () => {
     if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
     session.callEnd = new Date().toISOString();
-
     const payload = {
       sessionId,
       callStart: session.callStart,
