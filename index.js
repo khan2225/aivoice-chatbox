@@ -156,24 +156,25 @@ fastify.register(async (fastify) => {
                     console.log(`Received event: ${response.type}`, response);
                 }
 
-                // User message transcription handling
+                // Scammer message transcription handling
                 if (
                     response.type ===
                     "conversation.item.input_audio_transcription.completed"
                 ) {
                     const userMessage = response.transcript.trim();
-                    session.transcript += `User: ${userMessage}\n`;
-                    console.log(`User (${sessionId}): ${userMessage}`);
+                    session.transcript += `Scammer: ${userMessage}\n`;
+                    console.log(`Scammer (${sessionId}): ${userMessage}`);
                 }
 
-                // Agent message handling
+                // AI message handling
                 if (response.type === "response.done") {
                     const agentMessage =
                         response.response.output[0]?.content?.find(
                             (content) => content.transcript,
-                        )?.transcript || "Agent message not found";
-                    session.transcript += `Agent: ${agentMessage}\n`;
-                    console.log(`Agent (${sessionId}): ${agentMessage}`);
+                        )?.transcript;
+                        if(agentMessage){ 
+                        session.transcript += `AI: ${agentMessage}\n`;
+                        console.log(`AI (${sessionId}): ${agentMessage}`)};
                 }
 
                 if (response.type === "session.updated") {
