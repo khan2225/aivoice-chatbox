@@ -70,27 +70,24 @@ fastify.get("/", async (request, reply) => {
 fastify.all("/incoming-call", async (request, reply) => {
     console.log("Incoming call");
 
-    const callerPhone = request.body?.From || "unknown";  //The real phone number
-    const twilioPhone = request.body?.To || "unknown";    //The Twilio number
+   // const callerPhone = request.body?.From || "unknown";  // Real caller phone number (not used yet)
+   // const twilioPhone = request.body?.To || "unknown";    // Twilio number (not used yet)
 
-    console.log(" Caller Phone (From):", callerPhone);
-    console.log(" Twilio Number (To):", twilioPhone);
+    console.log("Caller Phone (From):", callerPhone);
+    console.log("Twilio Number (To):", twilioPhone);
 
-    //const personaKey = queryParams.persona || "genZ";
-    const personaKey = "texanDude";
+    const personaKey = "texanDude"; // Hardcoded for now
 
-    const personaParam = encodeURIComponent(personaKey);
-    const callerParam = encodeURIComponent(callerPhone);
-    
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
-    <Response>
-      <Connect>
-        <Stream url="wss://${request.headers.host}/media-stream?persona=${personaParam}&callerPhone=${callerParam}" />
-      </Connect>
-    </Response>`;
-    
+<Response>
+  <Connect>
+    <Stream url="wss://${request.headers.host}/media-stream?persona=${personaKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" />
+  </Connect>
+</Response>`;
+
     reply.type("text/xml").send(twimlResponse);
 });
+
 
 // WebSocket route for media-stream
 fastify.register(async (fastify) => {
