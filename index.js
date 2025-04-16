@@ -252,6 +252,12 @@ fastify.register(async (fastify) => {
             console.log("Full Transcript:");
             console.log(session.transcript);
 
+            const session = sessions.get(sessionId);
+            if (session) {
+                session.callEnd = new Date().toISOString();
+                console.log("Call end time:", session.callEnd);
+            }
+
             await processTranscriptAndSend(session.transcript, sessionId);
 
             // Clean up the session
