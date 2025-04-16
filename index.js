@@ -90,44 +90,43 @@ fastify.all("/incoming-call", async (request, reply) => {
 
 
 // WebSocket route for media-stream
+// WebSocket route for media-stream
 fastify.register(async (fastify) => {
     fastify.get("/media-stream", { websocket: true }, async (connection, req) => {
         console.log("Client connected");
 
         // 1. Extract query params
         const queryParams = querystring.parse(req.url.split("?")[1]);
-
-        //callerPhone
-        //const callerPhone = queryParams.callerPhone || "unknown"; 
-
         const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
+        const personaKey = "texanDude"; // fallback for now
 
-        // 2. Fallback values (hardcoded for testing)
-        let personaKey = "texanDude";
+        // 2. Define session FIRST and store it immediately
+        let session = sessions.get(sessionId) || {
+            transcript: "",
+            streamSid: null,
+            callStart: new Date().toISOString(),
+            personaKey,
+        };
+        sessions.set(sessionId, session);
+
+        // 3. Assign fallback voice & system message
         let voice = PERSONAS[personaKey].voice;
         let systemMessage = PERSONAS[personaKey].systemMessage;
 
+        console.log("Parsed personaKey from querystring:", personaKey);
 
-    console.log("Parsed personaKey from querystring:", personaKey);
-
-        // 3. Try to fetch dynamic persona via pull-pref API
+        // 4. Try pull-pref (optional dynamic prompt/voice)
         try {
             const response = await fetch("https://scam-scam-service-185231488037.us-central1.run.app/api/v1/app/pull-pref", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ user: "1" })  // Replace with dynamic user ID later
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user: "1" }),
             });
 
             if (response.ok) {
                 const prefData = await response.json();
-                if (prefData?.result?.voice) {
-                    voice = prefData.result.voice;
-                }
-                if (prefData?.result?.prompt) {
-                    systemMessage = prefData.result.prompt;
-                }
+                if (prefData?.result?.voice) voice = prefData.result.voice;
+                if (prefData?.result?.prompt) systemMessage = prefData.result.prompt;
             } else {
                 console.warn("pull-pref failed with status", response.status);
             }
@@ -135,22 +134,11 @@ fastify.register(async (fastify) => {
             console.warn("pull-pref fetch error:", err.message);
         }
 
-        console.log("Final Voice:", voice);
-        console.log("Final Prompt (preview):", systemMessage.substring(0, 60) + "...");
-
-        // 4. Save session
-        let session;
-        
-        session = sessions.get(sessionId) || {
-            transcript: "",
-            streamSid: null,
-            callStart: new Date().toISOString(),
-        };
-        session.personaKey = personaKey;
         session.voice = voice;
         session.prompt = systemMessage;
-        //session.callerPhone = callerPhone;
-        sessions.set(sessionId, session);
+
+        console.log("Final Voice:", voice);
+        console.log("Final Prompt (preview):", systemMessage.substring(0, 60) + "...");
         console.log("Final session object:", session);
 
         // 5. Connect to OpenAI
@@ -172,12 +160,9 @@ fastify.register(async (fastify) => {
                     instructions: systemMessage,
                     modalities: ["text", "audio"],
                     temperature: 0.8,
-                    input_audio_transcription: {
-                        model: "whisper-1",
-                    },
+                    input_audio_transcription: { model: "whisper-1" },
                 },
             };
-
             console.log("Sending session update to OpenAI:", JSON.stringify(sessionUpdate, null, 2));
             openAiWs.send(JSON.stringify(sessionUpdate));
         };
@@ -187,11 +172,10 @@ fastify.register(async (fastify) => {
             setTimeout(sendSessionUpdate, 100); // slight delay
         });
 
-        // OpenAI response handler
+        // 6. Handle AI messages
         openAiWs.on("message", (data) => {
             try {
                 const response = JSON.parse(data);
-
                 if (LOG_EVENT_TYPES.includes(response.type)) {
                     console.log(`Received event: ${response.type}`, response);
                 }
@@ -203,17 +187,11 @@ fastify.register(async (fastify) => {
                 }
 
                 if (response.type === "response.done") {
-                    const agentMessage = response.response.output[0]?.content?.find(
-                        (content) => content.transcript,
-                    )?.transcript;
+                    const agentMessage = response.response.output[0]?.content?.find(c => c.transcript)?.transcript;
                     if (agentMessage) {
                         session.transcript += `AI: ${agentMessage}\n`;
                         console.log(`AI (${sessionId}): ${agentMessage}`);
                     }
-                }
-
-                if (response.type === "session.updated") {
-                    console.log("Session updated successfully:", response);
                 }
 
                 if (response.type === "response.audio.delta" && response.delta) {
@@ -226,12 +204,13 @@ fastify.register(async (fastify) => {
                     };
                     connection.send(JSON.stringify(audioDelta));
                 }
+
             } catch (error) {
                 console.error("Error processing OpenAI message:", error, "Raw:", data);
             }
         });
 
-        // Handle incoming messages from Twilio
+        // 7. Handle incoming Twilio stream messages
         connection.on("message", (message) => {
             try {
                 const data = JSON.parse(message);
@@ -258,20 +237,16 @@ fastify.register(async (fastify) => {
             }
         });
 
-        // On connection close
+        // 8. Cleanup on hangup
         connection.on("close", async () => {
             if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
             console.log(`Client disconnected (${sessionId}).`);
             console.log("Full Transcript:\n" + session.transcript);
 
-            if (session) {
-                session.callEnd = new Date().toISOString();
-                console.log("Call end time:", session.callEnd);
-            }
+            session.callEnd = new Date().toISOString();
+            console.log("Call end time:", session.callEnd);
 
             await processTranscriptAndSend(session.transcript, sessionId);
-
-            //Session deleted
             sessions.delete(sessionId);
         });
 
@@ -284,6 +259,7 @@ fastify.register(async (fastify) => {
         });
     });
 });
+
 
 fastify.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
     if (err) {
