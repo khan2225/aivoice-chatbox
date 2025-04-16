@@ -70,86 +70,122 @@ fastify.get("/", async (request, reply) => {
 fastify.all("/incoming-call", async (request, reply) => {
     console.log("Incoming call");
 
+    const callerPhone = request.body?.From || "unknown";  //The real phone number
+    const twilioPhone = request.body?.To || "unknown";    //The Twilio number
+
+    console.log(" Caller Phone (From):", callerPhone);
+    console.log(" Twilio Number (To):", twilioPhone);
+
     //const personaKey = queryParams.persona || "genZ";
     const personaKey = "texanDude";
 
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
     <Response>
         <Connect>
-            <Stream url="wss://${request.headers.host}/media-stream?persona=${personaKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" />
+            <Stream url="wss://${request.headers.host}/media-stream?persona=${personaKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}&callerPhone=${encodeURIComponent(callerPhone)}" />
         </Connect>
-    </Response>`;
-    
+    </Response>`;    
 
     reply.type("text/xml").send(twimlResponse);
 });
 
 // WebSocket route for media-stream
 fastify.register(async (fastify) => {
-    fastify.get("/media-stream", { websocket: true }, (connection, req) => {
+    fastify.get("/media-stream", { websocket: true }, async (connection, req) => {
         console.log("Client connected");
 
-    // 1. Extract personaKey from WebSocket query string
-    const queryParams = querystring.parse(req.url.split("?")[1]);
-    //const personaKey = queryParams.persona || "genZ";
-    const personaKey = "texanDude";
+        // 1. Extract query params
+        const queryParams = querystring.parse(req.url.split("?")[1]);
+
+        //callerPhone
+        const callerPhone = queryParams.callerPhone || "unknown"; 
+
+        const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
+
+        // 2. Fallback values (hardcoded for testing)
+        let personaKey = "texanDude";
+        let voice = PERSONAS[personaKey].voice;
+        let systemMessage = PERSONAS[personaKey].systemMessage;
+
 
     console.log("Parsed personaKey from querystring:", personaKey);
 
-    // 2. Store session with correct personaKey
-    const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
-    let session = sessions.get(sessionId) || {
-        transcript: "",
-        streamSid: null,
-        callStart: new Date().toISOString(),
-    };
-    session.personaKey = personaKey;
-    sessions.set(sessionId, session);
-    console.log("Final session object:", session);
-
-    // 3. Load selected persona AFTER session.personaKey is stored
-    const selectedPersona = PERSONAS[session.personaKey] || PERSONAS["genZ"];
-    console.log("Selected Persona:", session.personaKey);
-    console.log("Voice:", selectedPersona.voice);
-    console.log("Prompt (preview):", selectedPersona.systemMessage.substring(0, 60) + "...");
-
-    // 4. Connect to OpenAI
-    const openAiWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", {
-        headers: {
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-            "OpenAI-Beta": "realtime=v1",
-        },
-    });
-
-    // 5. Send session update when connected
-    const sendSessionUpdate = () => {
-        const sessionUpdate = {
-            type: "session.update",
-            session: {
-                turn_detection: { type: "server_vad" },
-                input_audio_format: "g711_ulaw",
-                output_audio_format: "g711_ulaw",
-                voice: selectedPersona.voice,
-                instructions: selectedPersona.systemMessage,
-                modalities: ["text", "audio"],
-                temperature: 0.8,
-                input_audio_transcription: {
-                    model: "whisper-1",
+        // 3. Try to fetch dynamic persona via pull-pref API
+        try {
+            const response = await fetch("https://scam-scam-service-185231488037.us-central1.run.app/api/v1/app/pull-pref", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
                 },
+                body: JSON.stringify({ user: "1" })  // Replace with dynamic user ID later
+            });
+
+            if (response.ok) {
+                const prefData = await response.json();
+                if (prefData?.result?.voice) {
+                    voice = prefData.result.voice;
+                }
+                if (prefData?.result?.prompt) {
+                    systemMessage = prefData.result.prompt;
+                }
+            } else {
+                console.warn("pull-pref failed with status", response.status);
+            }
+        } catch (err) {
+            console.warn("pull-pref fetch error:", err.message);
+        }
+
+        console.log("Final Voice:", voice);
+        console.log("Final Prompt (preview):", systemMessage.substring(0, 60) + "...");
+
+        // 4. Save session
+        let session = sessions.get(sessionId) || {
+            transcript: "",
+            streamSid: null,
+            callStart: new Date().toISOString(),
+        };
+        session.personaKey = personaKey;
+        session.voice = voice;
+        session.prompt = systemMessage;
+        session.callerPhone = callerPhone;
+        sessions.set(sessionId, session);
+        console.log("Final session object:", session);
+
+        // 5. Connect to OpenAI
+        const openAiWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", {
+            headers: {
+                Authorization: `Bearer ${OPENAI_API_KEY}`,
+                "OpenAI-Beta": "realtime=v1",
             },
+        });
+
+        const sendSessionUpdate = () => {
+            const sessionUpdate = {
+                type: "session.update",
+                session: {
+                    turn_detection: { type: "server_vad" },
+                    input_audio_format: "g711_ulaw",
+                    output_audio_format: "g711_ulaw",
+                    voice: voice,
+                    instructions: systemMessage,
+                    modalities: ["text", "audio"],
+                    temperature: 0.8,
+                    input_audio_transcription: {
+                        model: "whisper-1",
+                    },
+                },
+            };
+
+            console.log("Sending session update to OpenAI:", JSON.stringify(sessionUpdate, null, 2));
+            openAiWs.send(JSON.stringify(sessionUpdate));
         };
 
-        console.log("Sending session update to OpenAI:", JSON.stringify(sessionUpdate, null, 2));
-        openAiWs.send(JSON.stringify(sessionUpdate));
-    };
+        openAiWs.on("open", () => {
+            console.log("Connected to the OpenAI Realtime API");
+            setTimeout(sendSessionUpdate, 250); // slight delay
+        });
 
-    openAiWs.on("open", () => {
-        console.log("Connected to the OpenAI Realtime API");
-        setTimeout(sendSessionUpdate, 250); // slight delay for stability
-    });
-
-
-        // Listen for messages from the OpenAI WebSocket
+        // OpenAI response handler
         openAiWs.on("message", (data) => {
             try {
                 const response = JSON.parse(data);
@@ -158,54 +194,38 @@ fastify.register(async (fastify) => {
                     console.log(`Received event: ${response.type}`, response);
                 }
 
-                // Scammer message transcription handling
-                if (
-                    response.type ===
-                    "conversation.item.input_audio_transcription.completed"
-                ) {
+                if (response.type === "conversation.item.input_audio_transcription.completed") {
                     const userMessage = response.transcript.trim();
                     session.transcript += `Scammer: ${userMessage}\n`;
                     console.log(`Scammer (${sessionId}): ${userMessage}`);
                 }
 
-                // AI message handling
                 if (response.type === "response.done") {
-                    const agentMessage =
-                        response.response.output[0]?.content?.find(
-                            (content) => content.transcript,
-                        )?.transcript;
-                        if(agentMessage){ 
+                    const agentMessage = response.response.output[0]?.content?.find(
+                        (content) => content.transcript,
+                    )?.transcript;
+                    if (agentMessage) {
                         session.transcript += `AI: ${agentMessage}\n`;
-                        console.log(`AI (${sessionId}): ${agentMessage}`)};
+                        console.log(`AI (${sessionId}): ${agentMessage}`);
+                    }
                 }
 
                 if (response.type === "session.updated") {
                     console.log("Session updated successfully:", response);
                 }
 
-                if (
-                    response.type === "response.audio.delta" &&
-                    response.delta
-                ) {
+                if (response.type === "response.audio.delta" && response.delta) {
                     const audioDelta = {
                         event: "media",
                         streamSid: session.streamSid,
                         media: {
-                            payload: Buffer.from(
-                                response.delta,
-                                "base64",
-                            ).toString("base64"),
+                            payload: Buffer.from(response.delta, "base64").toString("base64"),
                         },
                     };
                     connection.send(JSON.stringify(audioDelta));
                 }
             } catch (error) {
-                console.error(
-                    "Error processing OpenAI message:",
-                    error,
-                    "Raw message:",
-                    data,
-                );
+                console.error("Error processing OpenAI message:", error, "Raw:", data);
             }
         });
 
@@ -220,37 +240,27 @@ fastify.register(async (fastify) => {
                                 type: "input_audio_buffer.append",
                                 audio: data.media.payload,
                             };
-
                             openAiWs.send(JSON.stringify(audioAppend));
                         }
                         break;
                     case "start":
                         session.streamSid = data.start.streamSid;
-                        console.log(
-                            "Incoming stream has started",
-                            session.streamSid,
-                        );
+                        console.log("Incoming stream started:", session.streamSid);
                         break;
                     default:
                         console.log("Received non-media event:", data.event);
                         break;
                 }
             } catch (error) {
-                console.error(
-                    "Error parsing message:",
-                    error,
-                    "Message:",
-                    message,
-                );
+                console.error("Error parsing Twilio message:", error, "Message:", message);
             }
         });
 
-        // Handle connection close and log transcript
+        // On connection close
         connection.on("close", async () => {
             if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
             console.log(`Client disconnected (${sessionId}).`);
-            console.log("Full Transcript:");
-            console.log(session.transcript);
+            console.log("Full Transcript:\n" + session.transcript);
 
             const session = sessions.get(sessionId);
             if (session) {
@@ -260,17 +270,16 @@ fastify.register(async (fastify) => {
 
             await processTranscriptAndSend(session.transcript, sessionId);
 
-            // Clean up the session
+            //Session deleted
             sessions.delete(sessionId);
         });
 
-        // Handle WebSocket close and errors
         openAiWs.on("close", () => {
-            console.log("Disconnected from the OpenAI Realtime API");
+            console.log("Disconnected from OpenAI Realtime API");
         });
 
-        openAiWs.on("error", (error) => {
-            console.error("Error in the OpenAI WebSocket:", error);
+        openAiWs.on("error", (err) => {
+            console.error("OpenAI WS error:", err);
         });
     });
 });
@@ -398,8 +407,11 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
                     const payload = {
                         ...parsedContent,
                         persona: session?.personaKey || "unknown",
+                        voice: session?.voice || "unknown",
+                        prompt: session?.prompt || "unknown",
+                        callerPhone: session?.callerPhone || "unknown",
                         callStart: session?.callStart || "unknown",
-                        callEnd: new Date().toISOString(),
+                        callEnd: session?.callEnd || new Date().toISOString(),
                     };
 
                     // Send payload with metadata to webhook
