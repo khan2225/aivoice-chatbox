@@ -211,33 +211,40 @@ fastify.register(async (fastify) => {
         });
 
 // 7. Handle incoming Twilio stream messages
+
+let audioQueue = [];
+
 connection.on("message", (message) => {
     try {
         const data = JSON.parse(message);
 
         switch (data.event) {
-            case "media":
-                if (!session.streamSid) {
-                    console.warn("Cannot send audio delta: streamSid is missing.");
-                    return;
-                }
-
-                if (openAiWs.readyState === WebSocket.OPEN) {
-                    const audioAppend = {
-                        type: "input_audio_buffer.append",
-                        audio: data.media.payload,
-                    };
-
-                    openAiWs.send(JSON.stringify(audioAppend));
-                }
-                break;
-
             case "start":
                 if (data.start?.streamSid) {
                     session.streamSid = data.start.streamSid;
                     console.log("Incoming stream started. streamSid:", session.streamSid);
+
+                    // Flush any queued audio chunks now that streamSid is available
+                    if (audioQueue.length > 0 && openAiWs.readyState === WebSocket.OPEN) {
+                        audioQueue.forEach((chunk) => openAiWs.send(JSON.stringify(chunk)));
+                        audioQueue = [];
+                    }
                 } else {
                     console.warn("'start' event received, but no streamSid found!", data);
+                }
+                break;
+
+            case "media":
+                const audioAppend = {
+                    type: "input_audio_buffer.append",
+                    audio: data.media.payload,
+                };
+
+                if (session.streamSid && openAiWs.readyState === WebSocket.OPEN) {
+                    openAiWs.send(JSON.stringify(audioAppend));
+                } else {
+                    console.warn("Queuing audio until streamSid is available...");
+                    audioQueue.push(audioAppend);
                 }
                 break;
 
