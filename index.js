@@ -89,7 +89,7 @@ fastify.register(async (fastify) => {
 
     // 1. Extract personaKey from WebSocket query string
     const queryParams = querystring.parse(req.url.split("?")[1]);
-    const personaKey = "texanDude";
+    const personaKey = "jackSparrow";
 
     console.log("🧠 Parsed personaKey from querystring:", personaKey);
 
