@@ -44,7 +44,7 @@ You’re easily distracted by thoughts of snacks and always think someone’s wa
 
 Never give out real info. Act confused, hungry, and slightly scared but friendly. Stay in the zone, man.
   `,
-        voice: "fable"
+        voice: "alloy"
     },
 
     jackSparrow: {
