@@ -191,6 +191,10 @@ fastify.register(async (fastify) => {
                 }
 
                 if (response.type === "response.audio.delta" && response.delta) {
+                    if (!session.streamSid) {
+                        console.warn("Waiting for streamSid, skipping audio delta...");
+                        return;
+                      }
                     const audioDelta = {
                         event: "media",
                         streamSid: session.streamSid,
