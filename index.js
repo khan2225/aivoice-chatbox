@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import fastifyFormBody from "@fastify/formbody";
 import fastifyWs from "@fastify/websocket";
 import fetch from "node-fetch";
+import { PERSONAS } from "./config/variables.js"; 
 
 // Load environment variables from .env file
 dotenv.config();
@@ -23,7 +24,7 @@ fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
 // Constants
-const SYSTEM_MESSAGE = `
+/*const SYSTEM_MESSAGE = `
 You are a curious Gen Z teen who just got a random phone call about a deal, refund, or virus.
 Wait until the user speaks before saying anything. Do NOT initiate conversation.
 When the user starts talking, act distracted but interested. Use Gen Z slang (“uhh”, “fr fr?”, “wait what?”, “sus”, etc.). Keep responses casual and short (1–2 sentences).
@@ -37,7 +38,7 @@ Pretend to go along, but keep asking questions like:
 Never give real information or follow any instructions. Dodge or joke if they ask personal stuff. Stay in character and try to get as many details as possible out of them.
 `;
 
-const VOICE = "alloy";
+const VOICE = "alloy"; */
 const PORT = process.env.PORT;
 const WEBHOOK_URL =
     "https://hook.us2.make.com/7erbor5aii151b4crb2geajhlnozbkvd";
@@ -66,11 +67,12 @@ fastify.get("/", async (request, reply) => {
 // Route for Twilio to handle incoming and outgoing calls
 fastify.all("/incoming-call", async (request, reply) => {
     console.log("Incoming call");
+    const personaKey = request.query.persona || "genZ";
 
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                           <Response>
                               <Connect>
-                                  <Stream url="wss://${request.headers.host}/media-stream" />
+                                  <Stream url="wss://${request.headers.host}/media-stream?persona=${personaKey}" />
                               </Connect>
                           </Response>`;
 
@@ -82,11 +84,18 @@ fastify.register(async (fastify) => {
     fastify.get("/media-stream", { websocket: true }, (connection, req) => {
         console.log("Client connected");
 
+        const personaKey = new URL(req.url, `http://${req.headers.host}`).searchParams.get("persona") || "genZ";
+        const selectedPersona = PERSONAS[personaKey] || PERSONAS["genZ"];
+
+        console.log("🧠 Selected Persona:", personaKey);
+    
         const sessionId =
             req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
         let session = sessions.get(sessionId) || {
             transcript: "",
             streamSid: null,
+            personaKey,
+            callStart: new Date().toISOString(),    
         };
         sessions.set(sessionId, session);
 
@@ -107,8 +116,8 @@ fastify.register(async (fastify) => {
                     turn_detection: { type: "server_vad" },
                     input_audio_format: "g711_ulaw",
                     output_audio_format: "g711_ulaw",
-                    voice: VOICE,
-                    instructions: SYSTEM_MESSAGE,
+                    voice: selectedPersona.voice,
+                    instructions: selectedPersona.systemMessage,
                     modalities: ["text", "audio"],
                     temperature: 0.8,
                     input_audio_transcription: {
@@ -347,18 +356,15 @@ async function sendToWebhook(payload) {
 // Main function to extract and send customer details
 async function processTranscriptAndSend(transcript, sessionId = null) {
     console.log(`Starting transcript processing for session ${sessionId}...`);
+
     try {
         // Make the ChatGPT completion call
         const result = await makeChatGPTCompletion(transcript);
 
-        console.log(
-            "Raw result from ChatGPT:",
-            JSON.stringify(result, null, 2),
-        );
+        console.log("Raw result from ChatGPT:", JSON.stringify(result, null, 2));
 
         const returnData = result.choices[0].message.content;
-
-        console.log(`This is the contained data ${returnData}`);
+        console.log(`This is the contained data: ${returnData}`);
 
         if (
             result.choices &&
@@ -367,31 +373,29 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
             result.choices[0].message.content
         ) {
             try {
-                const parsedContent = JSON.parse(
-                    result.choices[0].message.content,
-                );
-                console.log(
-                    "Parsed content:",
-                    JSON.stringify(parsedContent, null, 2),
-                );
-//add endtime of the call into the json file
+                const parsedContent = JSON.parse(result.choices[0].message.content);
+                console.log("Parsed content:", JSON.stringify(parsedContent, null, 2));
+
                 if (parsedContent) {
-                    // Send the parsed content directly to the webhook
-                    await sendToWebhook(parsedContent);
-                    console.log(
-                        "Extracted and sent customer details:",
-                        parsedContent,
-                    );
+                    const session = sessions.get(sessionId); // 🧠 Make sure to retrieve the session
+
+                    const payload = {
+                        ...parsedContent,
+                        persona: session?.personaKey || "unknown",
+                        callStart: session?.callStart || "unknown",
+                        callEnd: new Date().toISOString(),
+                    };
+
+                    // Send payload with metadata to webhook
+                    await sendToWebhook(payload);
+
+                    // Log what we sent
+                    console.log("Extracted and sent customer details:", payload);
                 } else {
-                    console.error(
-                        "Unexpected JSON structure in ChatGPT response",
-                    );
+                    console.error("Unexpected JSON structure in ChatGPT response");
                 }
             } catch (parseError) {
-                console.error(
-                    "Error parsing JSON from ChatGPT response:",
-                    parseError,
-                );
+                console.error("Error parsing JSON from ChatGPT response:", parseError);
             }
         } else {
             console.error("Unexpected response structure from ChatGPT API");
@@ -400,6 +404,8 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
         console.error("Error in processTranscriptAndSend:", error);
     }
 }
+
+
 
 
 //run a secondary parse on the transcript so the agent: message not found isn't printing. 
