@@ -69,7 +69,8 @@ fastify.get("/", async (request, reply) => {
 // Route for Twilio to handle incoming and outgoing calls
 fastify.all("/incoming-call", async (request, reply) => {
     console.log("Incoming call");
-    const personaKey = request.query.persona || "genZ";
+    //const personaKey = request.query.persona || "genZ";
+    const personaKey = "shaggy";
 
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
     <Response>
@@ -89,9 +90,9 @@ fastify.register(async (fastify) => {
 
     // 1. Extract personaKey from WebSocket query string
     const queryParams = querystring.parse(req.url.split("?")[1]);
-    const personaKey = "jackSparrow";
+    const personaKey = queryParams.persona || "genZ";
 
-    console.log("🧠 Parsed personaKey from querystring:", personaKey);
+    console.log("Parsed personaKey from querystring:", personaKey);
 
     // 2. Store session with correct personaKey
     const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
@@ -102,13 +103,13 @@ fastify.register(async (fastify) => {
     };
     session.personaKey = personaKey;
     sessions.set(sessionId, session);
-    console.log("📦 Final session object:", session);
+    console.log("Final session object:", session);
 
     // 3. Load selected persona AFTER session.personaKey is stored
     const selectedPersona = PERSONAS[session.personaKey] || PERSONAS["genZ"];
-    console.log("🎭 Selected Persona:", session.personaKey);
-    console.log("🔊 Voice:", selectedPersona.voice);
-    console.log("📝 Prompt (preview):", selectedPersona.systemMessage.substring(0, 60) + "...");
+    console.log("Selected Persona:", session.personaKey);
+    console.log("Voice:", selectedPersona.voice);
+    console.log("Prompt (preview):", selectedPersona.systemMessage.substring(0, 60) + "...");
 
     // 4. Connect to OpenAI
     const openAiWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", {
@@ -136,12 +137,12 @@ fastify.register(async (fastify) => {
             },
         };
 
-        console.log("🛰️ Sending session update to OpenAI:", JSON.stringify(sessionUpdate, null, 2));
+        console.log("Sending session update to OpenAI:", JSON.stringify(sessionUpdate, null, 2));
         openAiWs.send(JSON.stringify(sessionUpdate));
     };
 
     openAiWs.on("open", () => {
-        console.log("🌐 Connected to the OpenAI Realtime API");
+        console.log("Connected to the OpenAI Realtime API");
         setTimeout(sendSessionUpdate, 250); // slight delay for stability
     });
 
@@ -209,18 +210,6 @@ fastify.register(async (fastify) => {
         connection.on("message", (message) => {
             try {
                 const data = JSON.parse(message);
-                if (data.event === "media") {
-                    console.log("🎤 Twilio sent audio data");
-                }
-        
-                if (data.event === "start") {
-                    console.log("📞 Twilio stream started:", data.start.streamSid);
-                }
-        
-                if (data.event === "stop") {
-                    console.log("⛔ Twilio stream stopped");
-                }
-
                 switch (data.event) {
                     case "media":
                         if (openAiWs.readyState === WebSocket.OPEN) {
@@ -395,7 +384,7 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
                 console.log("Parsed content:", JSON.stringify(parsedContent, null, 2));
 
                 if (parsedContent) {
-                    const session = sessions.get(sessionId); // 🧠 Make sure to retrieve the session
+                    const session = sessions.get(sessionId); //Make sure to retrieve the session
 
                     const payload = {
                         ...parsedContent,
