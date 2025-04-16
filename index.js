@@ -95,6 +95,8 @@ fastify.get("/media-stream", { websocket: true }, (connection, req) => {
   });
 
   openAiWs.on("message", (data) => {
+    console.log("📩 OpenAI Raw:", data);
+
     try {
       const res = JSON.parse(data);
 
@@ -128,6 +130,7 @@ fastify.get("/media-stream", { websocket: true }, (connection, req) => {
   });
 
   connection.socket.on("message", (message) => {
+    console.log("📡 Incoming Twilio message:", message);
     try {
       const data = JSON.parse(message);
       if (data.event === "media") {
