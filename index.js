@@ -69,9 +69,10 @@ fastify.get("/", async (request, reply) => {
 // Route for Twilio to handle incoming and outgoing calls
 fastify.all("/incoming-call", async (request, reply) => {
     console.log("Incoming call");
-    const personaKey = request.query.persona || "genZ";
-    //const personaKey = "shaggy";
 
+    //const personaKey = queryParams.persona || "genZ";
+    const personaKey = "shaggy";
+    
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
     <Response>
         <Connect>
@@ -90,7 +91,8 @@ fastify.register(async (fastify) => {
 
     // 1. Extract personaKey from WebSocket query string
     const queryParams = querystring.parse(req.url.split("?")[1]);
-    const personaKey = queryParams.persona || "genZ";
+    //const personaKey = queryParams.persona || "genZ";
+    const personaKey = "shaggy";
 
     console.log("Parsed personaKey from querystring:", personaKey);
 
@@ -416,4 +418,3 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
 
 
 
-//run a secondary parse on the transcript so the agent: message not found isn't printing. 
