@@ -209,6 +209,17 @@ fastify.register(async (fastify) => {
         connection.on("message", (message) => {
             try {
                 const data = JSON.parse(message);
+                if (data.event === "media") {
+                    console.log("🎤 Twilio sent audio data");
+                }
+        
+                if (data.event === "start") {
+                    console.log("📞 Twilio stream started:", data.start.streamSid);
+                }
+        
+                if (data.event === "stop") {
+                    console.log("⛔ Twilio stream stopped");
+                }
 
                 switch (data.event) {
                     case "media":
