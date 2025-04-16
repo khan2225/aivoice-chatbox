@@ -57,6 +57,7 @@ fastify.all("/incoming-call", async (request, reply) => {
 });
 
 fastify.get("/media-stream", { websocket: true }, (connection, req) => {
+  console.log("🧠 WebSocket connected");
   console.log("✅ /media-stream connection established");
   const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
 
