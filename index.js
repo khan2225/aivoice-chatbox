@@ -107,6 +107,7 @@ fastify.get("/media-stream", { websocket: true }, (connection, req) => {
       }
 
       if (res.type === "response.audio.delta" && res.delta) {
+        console.log("🗣️ Sending audio delta to Twilio...");
         const audioDelta = {
           event: "media",
           streamSid: session.streamSid,
