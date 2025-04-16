@@ -106,6 +106,8 @@ fastify.register(async (fastify) => {
             personaKey,
             callStart: new Date().toISOString(),    
         };
+        console.log("🧠 Forcing session persona to:", personaKey);
+        session.personaKey = personaKey;
         sessions.set(sessionId, session);
 
         const openAiWs = new WebSocket(
@@ -135,10 +137,8 @@ fastify.register(async (fastify) => {
                 },
             };
 
-            console.log(
-                "Sending session update:",
-                JSON.stringify(sessionUpdate),
-            );
+            console.log("Sending session update:", JSON.stringify(sessionUpdate, null, 2));
+
             openAiWs.send(JSON.stringify(sessionUpdate));
         };
 
