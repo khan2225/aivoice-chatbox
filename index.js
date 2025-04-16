@@ -72,11 +72,12 @@ fastify.all("/incoming-call", async (request, reply) => {
     const personaKey = request.query.persona || "genZ";
 
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
-                          <Response>
-                              <Connect>
-                                  <Stream url="wss://${request.headers.host}/media-stream%3Fpersona%3D${personaKey}" />
-                              </Connect>
-                          </Response>`;
+    <Response>
+        <Connect>
+            <Stream url="wss://${request.headers.host}/media-stream?persona=${personaKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" />
+        </Connect>
+    </Response>`;
+    
 
     reply.type("text/xml").send(twimlResponse);
 });
