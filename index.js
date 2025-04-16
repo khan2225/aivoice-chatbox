@@ -73,8 +73,8 @@ fastify.all("/incoming-call", async (request, reply) => {
    // const callerPhone = request.body?.From || "unknown";  // Real caller phone number (not used yet)
    // const twilioPhone = request.body?.To || "unknown";    // Twilio number (not used yet)
 
-    console.log("Caller Phone (From):", callerPhone);
-    console.log("Twilio Number (To):", twilioPhone);
+   // console.log("Caller Phone (From):", callerPhone);
+   // console.log("Twilio Number (To):", twilioPhone);
 
     const personaKey = "texanDude"; // Hardcoded for now
 
@@ -98,7 +98,7 @@ fastify.register(async (fastify) => {
         const queryParams = querystring.parse(req.url.split("?")[1]);
 
         //callerPhone
-        const callerPhone = queryParams.callerPhone || "unknown"; 
+        //const callerPhone = queryParams.callerPhone || "unknown"; 
 
         const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
 
@@ -147,7 +147,7 @@ fastify.register(async (fastify) => {
         session.personaKey = personaKey;
         session.voice = voice;
         session.prompt = systemMessage;
-        session.callerPhone = callerPhone;
+        //session.callerPhone = callerPhone;
         sessions.set(sessionId, session);
         console.log("Final session object:", session);
 
@@ -409,7 +409,7 @@ async function processTranscriptAndSend(transcript, sessionId = null) {
                         persona: session?.personaKey || "unknown",
                         voice: session?.voice || "unknown",
                         prompt: session?.prompt || "unknown",
-                        callerPhone: session?.callerPhone || "unknown",
+                        //callerPhone: session?.callerPhone || "unknown",
                         callStart: session?.callStart || "unknown",
                         callEnd: session?.callEnd || new Date().toISOString(),
                     };
