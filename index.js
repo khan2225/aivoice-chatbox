@@ -139,7 +139,9 @@ fastify.register(async (fastify) => {
         console.log("Final Prompt (preview):", systemMessage.substring(0, 60) + "...");
 
         // 4. Save session
-        let session = sessions.get(sessionId) || {
+        let session;
+        
+        session = sessions.get(sessionId) || {
             transcript: "",
             streamSid: null,
             callStart: new Date().toISOString(),
@@ -262,7 +264,6 @@ fastify.register(async (fastify) => {
             console.log(`Client disconnected (${sessionId}).`);
             console.log("Full Transcript:\n" + session.transcript);
 
-            const session = sessions.get(sessionId);
             if (session) {
                 session.callEnd = new Date().toISOString();
                 console.log("Call end time:", session.callEnd);
