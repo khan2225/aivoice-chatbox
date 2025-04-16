@@ -29,7 +29,7 @@ Ask questions like:
 
 Never reveal anything. Stay suspicious but polite. Keep ‘em talking.
     `,
-        voice: "onyx"
+        voice: "echo"
     },
 
     shaggy: {
