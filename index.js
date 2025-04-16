@@ -87,66 +87,64 @@ fastify.register(async (fastify) => {
     fastify.get("/media-stream", { websocket: true }, (connection, req) => {
         console.log("Client connected");
 
-        console.log("🧩 Raw WebSocket URL:", req.url);
+    // 1. Extract personaKey from WebSocket query string
+    const queryParams = querystring.parse(req.url.split("?")[1]);
+    const personaKey = queryParams.persona || "genZ";
 
-        const queryParams = querystring.parse(req.url.split("?")[1]);
-        const personaKey = queryParams.persona || "genZ";
-        const selectedPersona = PERSONAS[personaKey] || PERSONAS["genZ"];
+    console.log("🧠 Parsed personaKey from querystring:", personaKey);
 
-        console.log("🧠 Selected Persona:", personaKey);
-        console.log("Parsed personaKey from querystring:", personaKey);
-        console.log("Selected system message voice:", selectedPersona.voice);
+    // 2. Store session with correct personaKey
+    const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
+    let session = sessions.get(sessionId) || {
+        transcript: "",
+        streamSid: null,
+        callStart: new Date().toISOString(),
+    };
+    session.personaKey = personaKey;
+    sessions.set(sessionId, session);
+    console.log("📦 Final session object:", session);
 
-    
-        const sessionId =
-            req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
-        let session = sessions.get(sessionId) || {
-            transcript: "",
-            streamSid: null,
-            personaKey,
-            callStart: new Date().toISOString(),    
-        };
-        console.log("🧠 Forcing session persona to:", personaKey);
-        session.personaKey = personaKey;
-        sessions.set(sessionId, session);
+    // 3. Load selected persona AFTER session.personaKey is stored
+    const selectedPersona = PERSONAS[session.personaKey] || PERSONAS["genZ"];
+    console.log("🎭 Selected Persona:", session.personaKey);
+    console.log("🔊 Voice:", selectedPersona.voice);
+    console.log("📝 Prompt (preview):", selectedPersona.systemMessage.substring(0, 60) + "...");
 
-        const openAiWs = new WebSocket(
-            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
-            {
-                headers: {
-                    Authorization: `Bearer ${OPENAI_API_KEY}`,
-                    "OpenAI-Beta": "realtime=v1",
+    // 4. Connect to OpenAI
+    const openAiWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", {
+        headers: {
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+            "OpenAI-Beta": "realtime=v1",
+        },
+    });
+
+    // 5. Send session update when connected
+    const sendSessionUpdate = () => {
+        const sessionUpdate = {
+            type: "session.update",
+            session: {
+                turn_detection: { type: "server_vad" },
+                input_audio_format: "g711_ulaw",
+                output_audio_format: "g711_ulaw",
+                voice: selectedPersona.voice,
+                instructions: selectedPersona.systemMessage,
+                modalities: ["text", "audio"],
+                temperature: 0.8,
+                input_audio_transcription: {
+                    model: "whisper-1",
                 },
             },
-        );
-
-        const sendSessionUpdate = () => {
-            const sessionUpdate = {
-                type: "session.update",
-                session: {
-                    turn_detection: { type: "server_vad" },
-                    input_audio_format: "g711_ulaw",
-                    output_audio_format: "g711_ulaw",
-                    voice: selectedPersona.voice,
-                    instructions: selectedPersona.systemMessage,
-                    modalities: ["text", "audio"],
-                    temperature: 0.8,
-                    input_audio_transcription: {
-                        model: "whisper-1",
-                    },
-                },
-            };
-
-            console.log("Sending session update:", JSON.stringify(sessionUpdate, null, 2));
-
-            openAiWs.send(JSON.stringify(sessionUpdate));
         };
 
-        // Open event for OpenAI WebSocket
-        openAiWs.on("open", () => {
-            console.log("Connected to the OpenAI Realtime API");
-            setTimeout(sendSessionUpdate, 250);
-        });
+        console.log("🛰️ Sending session update to OpenAI:", JSON.stringify(sessionUpdate, null, 2));
+        openAiWs.send(JSON.stringify(sessionUpdate));
+    };
+
+    openAiWs.on("open", () => {
+        console.log("🌐 Connected to the OpenAI Realtime API");
+        setTimeout(sendSessionUpdate, 250); // slight delay for stability
+    });
+
 
         // Listen for messages from the OpenAI WebSocket
         openAiWs.on("message", (data) => {
