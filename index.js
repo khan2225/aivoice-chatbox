@@ -102,6 +102,7 @@ fastify.register(async (fastify) => {
             streamSid: null,
             callStart: new Date().toISOString(),
             personaKey,
+            queuedAudio: [],
         };
         sessions.set(sessionId, session);
 
@@ -119,15 +120,17 @@ fastify.register(async (fastify) => {
                 body: JSON.stringify({ user: "1" }),
             });
 
-            if (response.ok) {
-                const prefData = await response.json();
-                if (prefData?.result?.voice) voice = prefData.result.voice;
-                if (prefData?.result?.prompt) systemMessage = prefData.result.prompt;
-            } else {
-                console.warn("pull-pref failed with status", response.status);
+            const prefData = await response.json();
+
+            // Validate and fallback to defaults if blank
+            if (prefData?.result?.voice?.trim()) {
+                voice = prefData.result.voice;
             }
-        } catch (err) {
-            console.warn("pull-pref fetch error:", err.message);
+        
+            if (prefData?.result?.prompt?.trim()) {
+                systemMessage = prefData.result.prompt;
+            } else {
+            console.warn("pull-pref failed with status", response.status);
         }
 
         session.voice = voice;
@@ -191,10 +194,6 @@ fastify.register(async (fastify) => {
                 }
 
                 if (response.type === "response.audio.delta" && response.delta) {
-                    if (!session.streamSid) {
-                        console.warn("Waiting for streamSid, skipping audio delta...");
-                        return;
-                      }
                     const audioDelta = {
                         event: "media",
                         streamSid: session.streamSid,
