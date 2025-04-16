@@ -69,8 +69,8 @@ fastify.get("/", async (request, reply) => {
 // Route for Twilio to handle incoming and outgoing calls
 fastify.all("/incoming-call", async (request, reply) => {
     console.log("Incoming call");
-    //const personaKey = request.query.persona || "genZ";
-    const personaKey = "shaggy";
+    const personaKey = request.query.persona || "genZ";
+    //const personaKey = "shaggy";
 
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
     <Response>
