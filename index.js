@@ -1,175 +1,405 @@
-// ✅ Enhanced debug version to test Cloud Run + OpenAI audio response
-// Includes test injection and full logging to verify pipeline
-
 import Fastify from "fastify";
 import WebSocket from "ws";
+import fs from "fs";
 import dotenv from "dotenv";
 import fastifyFormBody from "@fastify/formbody";
 import fastifyWs from "@fastify/websocket";
 import fetch from "node-fetch";
+
+// Load environment variables from .env file
 dotenv.config();
 
-const PORT = process.env.PORT;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const WEBHOOK_URL = "https://hook.us2.make.com/7erbor5aii151b4crb2geajhlnozbkvd";
+// Retrieve the OpenAI API key from environment variables
+const { OPENAI_API_KEY } = process.env;
 
-if (!OPENAI_API_KEY || !PORT) {
-  console.error("❌ Missing required environment variables.");
-  process.exit(1);
+if (!OPENAI_API_KEY) {
+    console.error("Missing OpenAI API key. Please set it in the .env file.");
+    process.exit(1);
 }
 
-const SYSTEM_MESSAGE = `
-Say: "Hi, this is the IRS refund office!" and wait for the caller's response.
-
-You are a curious Gen Z teen who just got a random phone call...
-...
-`;
-const VOICE = "alloy";
-const sessions = new Map();
-
+// Initialize Fastify
 const fastify = Fastify();
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
-fastify.get("/", async (_, reply) => {
-  reply.send({ message: "✅ Twilio Media Stream Server is running" });
+// Constants
+const SYSTEM_MESSAGE = `
+You are a curious Gen Z teen who just got a random phone call about a deal, refund, or virus.
+Wait until the user speaks before saying anything. Do NOT initiate conversation.
+When the user starts talking, act distracted but interested. Use Gen Z slang (“uhh”, “fr fr?”, “wait what?”, “sus”, etc.). Keep responses casual and short (1–2 sentences).
+
+Pretend to go along, but keep asking questions like:
+– What’s the deal?
+– Who are you?
+– What company?
+– How’s the payment?
+
+Never give real information or follow any instructions. Dodge or joke if they ask personal stuff. Stay in character and try to get as many details as possible out of them.
+`;
+
+const VOICE = "alloy";
+const PORT = process.env.PORT;
+const WEBHOOK_URL =
+    "https://hook.us2.make.com/7erbor5aii151b4crb2geajhlnozbkvd";
+
+// Session management
+const sessions = new Map();
+
+// List of Event Types to log to the console
+const LOG_EVENT_TYPES = [
+    "response.content.done",
+    "rate_limits.updated",
+    "response.done",
+    "input_audio_buffer.committed",
+    "input_audio_buffer.speech_stopped",
+    "input_audio_buffer.speech_started",
+    "session.created",
+    "response.text.done",
+    "conversation.item.input_audio_transcription.completed",
+];
+
+// Root Route
+fastify.get("/", async (request, reply) => {
+    reply.send({ message: "Twilio Media Stream Server is running!" });
 });
 
+// Route for Twilio to handle incoming and outgoing calls
 fastify.all("/incoming-call", async (request, reply) => {
-  const host = process.env.DOMAIN || request.headers.host;
-  const streamUrl = `wss://${host}/media-stream`;
-  const twimlResponse = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<Response>
-  <Connect>
-    <Stream url=\"${streamUrl.replace(/&/g, '&amp;')}\" />
-  </Connect>
-</Response>`;
+    console.log("Incoming call");
 
-  reply.type("text/xml").send(twimlResponse);
+    const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+                          <Response>
+                              <Connect>
+                                  <Stream url="wss://${request.headers.host}/media-stream" />
+                              </Connect>
+                          </Response>`;
+
+    reply.type("text/xml").send(twimlResponse);
 });
 
-fastify.get("/media-stream", { websocket: true }, (connection, req) => {
-  console.log("🧠 WebSocket connected to /media-stream");
-  const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
-  const session = {
-    transcript: [],
-    streamSid: null,
-    callStart: new Date().toISOString(),
-    callEnd: null
-  };
-  sessions.set(sessionId, session);
+// WebSocket route for media-stream
+fastify.register(async (fastify) => {
+    fastify.get("/media-stream", { websocket: true }, (connection, req) => {
+        console.log("Client connected");
 
-  const openAiWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", {
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "OpenAI-Beta": "realtime=v1"
-    }
-  });
-
-  openAiWs.on("open", () => {
-    console.log("🔌 Connected to OpenAI Realtime API");
-    const sessionUpdate = {
-      type: "session.update",
-      session: {
-        turn_detection: { type: "server_vad" },
-        input_audio_format: "g711_ulaw",
-        output_audio_format: "g711_ulaw",
-        voice: VOICE,
-        instructions: SYSTEM_MESSAGE,
-        modalities: ["text", "audio"],
-        temperature: 0.8,
-        input_audio_transcription: { model: "whisper-1" }
-      }
-    };
-    openAiWs.send(JSON.stringify(sessionUpdate));
-
-    // 🧪 Inject a fake message to simulate AI response
-    setTimeout(() => {
-      openAiWs.emit("message", JSON.stringify({
-        type: "conversation.item.input_audio_transcription.completed",
-        transcript: "Hi, is this the IRS refund office?"
-      }));
-    }, 500);
-  });
-
-  openAiWs.on("message", (data) => {
-    console.log("📩 OpenAI Raw:", data);
-    try {
-      const res = JSON.parse(data);
-
-      if (res.type === "conversation.item.input_audio_transcription.completed") {
-        const msg = res.transcript?.trim();
-        if (msg) {
-          session.transcript.push(`Scammer: ${msg}`);
-          console.log("🎤 Scammer:", msg);
-        }
-      }
-
-      if (res.type === "response.done") {
-        const reply = res.response.output[0]?.content?.find(c => c.transcript)?.transcript || "(no transcript)";
-        session.transcript.push(`AI: ${reply}`);
-        console.log("🧠 AI:", reply);
-      }
-
-      if (res.type === "response.audio.delta" && res.delta) {
-        console.log("🗣️ Sending audio delta to Twilio...");
-        const audioDelta = {
-          event: "media",
-          streamSid: session.streamSid,
-          media: {
-            payload: Buffer.from(res.delta, "base64").toString("base64")
-          }
+        const sessionId =
+            req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
+        let session = sessions.get(sessionId) || {
+            transcript: "",
+            streamSid: null,
         };
-        connection.socket.send(JSON.stringify(audioDelta));
-      }
-    } catch (err) {
-      console.error("🚨 Error parsing OpenAI message:", err);
-    }
-  });
+        sessions.set(sessionId, session);
 
-  connection.socket.on("message", (message) => {
-    console.log("📡 Incoming Twilio message:", message);
-    try {
-      const data = JSON.parse(message);
-      if (data.event === "media") {
-        openAiWs.send(JSON.stringify({
-          type: "input_audio_buffer.append",
-          audio: data.media.payload
-        }));
-      } else if (data.event === "start") {
-        session.streamSid = data.start.streamSid;
-        console.log("🔗 Twilio stream started:", session.streamSid);
-      }
-    } catch (err) {
-      console.error("❗ Error parsing Twilio message:", err);
-    }
-  });
+        const openAiWs = new WebSocket(
+            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
+            {
+                headers: {
+                    Authorization: `Bearer ${OPENAI_API_KEY}`,
+                    "OpenAI-Beta": "realtime=v1",
+                },
+            },
+        );
 
-  connection.socket.on("close", async () => {
-    if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
-    session.callEnd = new Date().toISOString();
-    const payload = {
-      sessionId,
-      callStart: session.callStart,
-      callEnd: session.callEnd,
-      fullTranscript: session.transcript.join("\n"),
-      user: "test-user"
-    };
-    await sendToWebhook(payload);
-    sessions.delete(sessionId);
-  });
+        const sendSessionUpdate = () => {
+            const sessionUpdate = {
+                type: "session.update",
+                session: {
+                    turn_detection: { type: "server_vad" },
+                    input_audio_format: "g711_ulaw",
+                    output_audio_format: "g711_ulaw",
+                    voice: VOICE,
+                    instructions: SYSTEM_MESSAGE,
+                    modalities: ["text", "audio"],
+                    temperature: 0.8,
+                    input_audio_transcription: {
+                        model: "whisper-1",
+                    },
+                },
+            };
+
+            console.log(
+                "Sending session update:",
+                JSON.stringify(sessionUpdate),
+            );
+            openAiWs.send(JSON.stringify(sessionUpdate));
+        };
+
+        // Open event for OpenAI WebSocket
+        openAiWs.on("open", () => {
+            console.log("Connected to the OpenAI Realtime API");
+            setTimeout(sendSessionUpdate, 250);
+        });
+
+        // Listen for messages from the OpenAI WebSocket
+        openAiWs.on("message", (data) => {
+            try {
+                const response = JSON.parse(data);
+
+                if (LOG_EVENT_TYPES.includes(response.type)) {
+                    console.log(`Received event: ${response.type}`, response);
+                }
+
+                // User message transcription handling
+                if (
+                    response.type ===
+                    "conversation.item.input_audio_transcription.completed"
+                ) {
+                    const userMessage = response.transcript.trim();
+                    session.transcript += `User: ${userMessage}\n`;
+                    console.log(`User (${sessionId}): ${userMessage}`);
+                }
+
+                // Agent message handling
+                if (response.type === "response.done") {
+                    const agentMessage =
+                        response.response.output[0]?.content?.find(
+                            (content) => content.transcript,
+                        )?.transcript || "Agent message not found";
+                    session.transcript += `Agent: ${agentMessage}\n`;
+                    console.log(`Agent (${sessionId}): ${agentMessage}`);
+                }
+
+                if (response.type === "session.updated") {
+                    console.log("Session updated successfully:", response);
+                }
+
+                if (
+                    response.type === "response.audio.delta" &&
+                    response.delta
+                ) {
+                    const audioDelta = {
+                        event: "media",
+                        streamSid: session.streamSid,
+                        media: {
+                            payload: Buffer.from(
+                                response.delta,
+                                "base64",
+                            ).toString("base64"),
+                        },
+                    };
+                    connection.send(JSON.stringify(audioDelta));
+                }
+            } catch (error) {
+                console.error(
+                    "Error processing OpenAI message:",
+                    error,
+                    "Raw message:",
+                    data,
+                );
+            }
+        });
+
+        // Handle incoming messages from Twilio
+        connection.on("message", (message) => {
+            try {
+                const data = JSON.parse(message);
+
+                switch (data.event) {
+                    case "media":
+                        if (openAiWs.readyState === WebSocket.OPEN) {
+                            const audioAppend = {
+                                type: "input_audio_buffer.append",
+                                audio: data.media.payload,
+                            };
+
+                            openAiWs.send(JSON.stringify(audioAppend));
+                        }
+                        break;
+                    case "start":
+                        session.streamSid = data.start.streamSid;
+                        console.log(
+                            "Incoming stream has started",
+                            session.streamSid,
+                        );
+                        break;
+                    default:
+                        console.log("Received non-media event:", data.event);
+                        break;
+                }
+            } catch (error) {
+                console.error(
+                    "Error parsing message:",
+                    error,
+                    "Message:",
+                    message,
+                );
+            }
+        });
+
+        // Handle connection close and log transcript
+        connection.on("close", async () => {
+            if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
+            console.log(`Client disconnected (${sessionId}).`);
+            console.log("Full Transcript:");
+            console.log(session.transcript);
+
+            await processTranscriptAndSend(session.transcript, sessionId);
+
+            // Clean up the session
+            sessions.delete(sessionId);
+        });
+
+        // Handle WebSocket close and errors
+        openAiWs.on("close", () => {
+            console.log("Disconnected from the OpenAI Realtime API");
+        });
+
+        openAiWs.on("error", (error) => {
+            console.error("Error in the OpenAI WebSocket:", error);
+        });
+    });
 });
 
 fastify.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
-  if (err) throw err;
-  console.log(`🚀 Server is listening on port ${PORT}`);
+    if (err) {
+        console.error(err);
+        process.exit(1);
+    }
+    console.log(`Server is listening on port ${PORT}`);
 });
 
-async function sendToWebhook(payload) {
-  const res = await fetch(WEBHOOK_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  console.log("📤 Webhook status:", res.status);
+// Function to make ChatGPT API completion call with structured outputs
+async function makeChatGPTCompletion(transcript) {
+    console.log("Starting ChatGPT API call...");
+    try {
+        const response = await fetch(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${OPENAI_API_KEY}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o-2024-08-06",
+                    messages: [
+                        {
+                            role: "system",
+                            content:
+                                "Extract scammer details: name, deal, and any special notes from the transcript.",
+                        },
+                        { role: "user", content: transcript },
+                    ],
+                    response_format: {
+                        type: "json_schema",
+                        json_schema: {
+                            name: "scammer_details_extraction",
+                            schema: {
+                                type: "object",
+                                properties: {
+                                    scammerName: { type: "string" },
+                                    scammerDeal: { type: "string" },
+                                    specialNotes: { type: "string" },
+                                    fullTranscript: { type: "string" },
+                                },
+                                required: [
+                                    "scammerName",
+                                    "scammerDeal",
+                                    "specialNotes",
+                                    "fullTranscript",
+                                ],
+                            },
+                        },
+                    },
+                }),
+            },
+        );
+
+        console.log("ChatGPT API response status:", response.status);
+        const data = await response.json();
+        console.log(
+            "Full ChatGPT API response:",
+            JSON.stringify(data, null, 2),
+        );
+        return data;
+    } catch (error) {
+        console.error("Error making ChatGPT completion call:", error);
+        throw error;
+    }
 }
+
+// Function to send data to Make.com webhook
+async function sendToWebhook(payload) {
+    console.log("Sending data to webhook:", JSON.stringify(payload, null, 2));
+    try {
+        const response = await fetch(WEBHOOK_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+
+        console.log("Webhook response status:", response.status);
+        if (response.ok) {
+            console.log("Data successfully sent to webhook.");
+        } else {
+            console.error(
+                "Failed to send data to webhook:",
+                response.statusText,
+            );
+        }
+    } catch (error) {
+        console.error("Error sending data to webhook:", error);
+    }
+}
+
+// Main function to extract and send customer details
+async function processTranscriptAndSend(transcript, sessionId = null) {
+    console.log(`Starting transcript processing for session ${sessionId}...`);
+    try {
+        // Make the ChatGPT completion call
+        const result = await makeChatGPTCompletion(transcript);
+
+        console.log(
+            "Raw result from ChatGPT:",
+            JSON.stringify(result, null, 2),
+        );
+
+        const returnData = result.choices[0].message.content;
+
+        console.log(`This is the contained data ${returnData}`);
+
+        if (
+            result.choices &&
+            result.choices[0] &&
+            result.choices[0].message &&
+            result.choices[0].message.content
+        ) {
+            try {
+                const parsedContent = JSON.parse(
+                    result.choices[0].message.content,
+                );
+                console.log(
+                    "Parsed content:",
+                    JSON.stringify(parsedContent, null, 2),
+                );
+//add endtime of the call into the json file
+                if (parsedContent) {
+                    // Send the parsed content directly to the webhook
+                    await sendToWebhook(parsedContent);
+                    console.log(
+                        "Extracted and sent customer details:",
+                        parsedContent,
+                    );
+                } else {
+                    console.error(
+                        "Unexpected JSON structure in ChatGPT response",
+                    );
+                }
+            } catch (parseError) {
+                console.error(
+                    "Error parsing JSON from ChatGPT response:",
+                    parseError,
+                );
+            }
+        } else {
+            console.error("Unexpected response structure from ChatGPT API");
+        }
+    } catch (error) {
+        console.error("Error in processTranscriptAndSend:", error);
+    }
+}
+
+
+//run a secondary parse on the transcript so the agent: message not found isn't printing. 
