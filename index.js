@@ -79,13 +79,16 @@ fastify.all("/incoming-call", async (request, reply) => {
     //const personaKey = queryParams.persona || "genZ";
     const personaKey = "texanDude";
 
+    const personaParam = encodeURIComponent(personaKey);
+    const callerParam = encodeURIComponent(callerPhone);
+    
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
     <Response>
-        <Connect>
-            <Stream url="wss://${request.headers.host}/media-stream?persona=${personaKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}&callerPhone=${encodeURIComponent(callerPhone)}" />
-        </Connect>
-    </Response>`;    
-
+      <Connect>
+        <Stream url="wss://${request.headers.host}/media-stream?persona=${personaParam}&callerPhone=${callerParam}" />
+      </Connect>
+    </Response>`;
+    
     reply.type("text/xml").send(twimlResponse);
 });
 
