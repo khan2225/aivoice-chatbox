@@ -246,23 +246,28 @@ import Fastify from "fastify";
          });
  
          // Handle connection close and log transcript
-         connection.on("close", async () => {
-             if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
-             console.log(`Client disconnected (${sessionId}).`);
-             console.log("Full Transcript:");
-             console.log(session.transcript);
- 
-             const session = sessions.get(sessionId);
-             if (session) {
-                 session.callEnd = new Date().toISOString();
-                 console.log("Call end time:", session.callEnd);
-             }
- 
-             await processTranscriptAndSend(session.transcript, sessionId);
- 
-             // Clean up the session
-             sessions.delete(sessionId);
-         });
+connection.on("close", async () => {
+    if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
+
+    const session = sessions.get(sessionId);
+    console.log(`Client disconnected (${sessionId}).`);
+
+    if (session) {
+        console.log("Full Transcript:");
+        console.log(session.transcript);
+
+        session.callEnd = new Date().toISOString();
+        console.log("Call end time:", session.callEnd);
+
+        await processTranscriptAndSend(session.transcript, sessionId);
+    } else {
+        console.warn(`No session found for ${sessionId}, skipping webhook send.`);
+    }
+
+    // Clean up the session
+    sessions.delete(sessionId);
+});
+
  
          // Handle WebSocket close and errors
          openAiWs.on("close", () => {
