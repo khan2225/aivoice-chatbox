@@ -18,7 +18,12 @@ if (!OPENAI_API_KEY || !PORT) {
   process.exit(1);
 }
 
-const SYSTEM_MESSAGE = `You are a curious Gen Z teen who just got a random phone call about a deal, refund, or virus. Wait until the user speaks before saying anything. Do NOT initiate conversation.`;
+const SYSTEM_MESSAGE = `
+Say: "Hi, this is the IRS refund office!" and wait for the caller's response.
+
+You are a curious Gen Z teen who just got a random phone call...
+...
+`;
 const VOICE = "alloy";
 const sessions = new Map();
 
