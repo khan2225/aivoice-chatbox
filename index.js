@@ -86,11 +86,16 @@ fastify.register(async (fastify) => {
     fastify.get("/media-stream", { websocket: true }, (connection, req) => {
         console.log("Client connected");
 
+        console.log("🧩 Raw WebSocket URL:", req.url);
+
         const queryParams = querystring.parse(req.url.split("?")[1]);
         const personaKey = queryParams.persona || "genZ";
         const selectedPersona = PERSONAS[personaKey] || PERSONAS["genZ"];
 
         console.log("🧠 Selected Persona:", personaKey);
+        console.log("Parsed personaKey from querystring:", personaKey);
+        console.log("Selected system message voice:", selectedPersona.voice);
+
     
         const sessionId =
             req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
