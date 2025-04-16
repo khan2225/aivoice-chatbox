@@ -184,7 +184,7 @@ fastify.register(async (fastify) => {
 
         openAiWs.on("open", () => {
             console.log("Connected to the OpenAI Realtime API");
-            setTimeout(sendSessionUpdate, 250); // slight delay
+            setTimeout(sendSessionUpdate, 100); // slight delay
         });
 
         // OpenAI response handler
