@@ -70,26 +70,22 @@ fastify.get("/", async (request, reply) => {
 fastify.all("/incoming-call", async (request, reply) => {
     console.log("Incoming call");
 
-   // const callerPhone = request.body?.From || "unknown";  // Real caller phone number (not used yet)
-   // const twilioPhone = request.body?.To || "unknown";    // Twilio number (not used yet)
-
-   // console.log("Caller Phone (From):", callerPhone);
-   // console.log("Twilio Number (To):", twilioPhone);
-
-    const personaKey = "texanDude"; // Hardcoded for now
+    //const personaKey = queryParams.persona || "genZ";
+    const personaKey = "texanDude";
 
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Connect>
-    <Stream url="wss://${request.headers.host}/media-stream?persona=${personaKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" />
-  </Connect>
-</Response>`;
+    <Response>
+        <Connect>
+            <Stream url="wss://${request.headers.host}/media-stream?persona=${personaKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" />
+        </Connect>
+    </Response>`;
+
 
     reply.type("text/xml").send(twimlResponse);
 });
 
 
-// WebSocket route for media-stream
+
 // WebSocket route for media-stream
 fastify.register(async (fastify) => {
     fastify.get("/media-stream", { websocket: true }, async (connection, req) => {
@@ -210,32 +206,46 @@ fastify.register(async (fastify) => {
             }
         });
 
-        // 7. Handle incoming Twilio stream messages
-        connection.on("message", (message) => {
-            try {
-                const data = JSON.parse(message);
-                switch (data.event) {
-                    case "media":
-                        if (openAiWs.readyState === WebSocket.OPEN) {
-                            const audioAppend = {
-                                type: "input_audio_buffer.append",
-                                audio: data.media.payload,
-                            };
-                            openAiWs.send(JSON.stringify(audioAppend));
-                        }
-                        break;
-                    case "start":
-                        session.streamSid = data.start.streamSid;
-                        console.log("Incoming stream started:", session.streamSid);
-                        break;
-                    default:
-                        console.log("Received non-media event:", data.event);
-                        break;
+// 7. Handle incoming Twilio stream messages
+connection.on("message", (message) => {
+    try {
+        const data = JSON.parse(message);
+
+        switch (data.event) {
+            case "media":
+                if (!session.streamSid) {
+                    console.warn("Cannot send audio delta: streamSid is missing.");
+                    return;
                 }
-            } catch (error) {
-                console.error("Error parsing Twilio message:", error, "Message:", message);
-            }
-        });
+
+                if (openAiWs.readyState === WebSocket.OPEN) {
+                    const audioAppend = {
+                        type: "input_audio_buffer.append",
+                        audio: data.media.payload,
+                    };
+
+                    openAiWs.send(JSON.stringify(audioAppend));
+                }
+                break;
+
+            case "start":
+                if (data.start?.streamSid) {
+                    session.streamSid = data.start.streamSid;
+                    console.log("Incoming stream started. streamSid:", session.streamSid);
+                } else {
+                    console.warn("'start' event received, but no streamSid found!", data);
+                }
+                break;
+
+            default:
+                console.log("Received non-media event:", data.event);
+                break;
+        }
+    } catch (error) {
+        console.error("Error parsing Twilio message:", error, "Message:", message);
+    }
+});
+
 
         // 8. Cleanup on hangup
         connection.on("close", async () => {
