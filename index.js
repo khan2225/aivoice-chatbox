@@ -77,15 +77,17 @@ fastify.get("/", async (_, reply) => {
 fastify.all("/incoming-call", async (request, reply) => {
   const personaKey = request.query.persona || "genZ";
   const host = process.env.DOMAIN || request.headers.host;
-  const twimlResponse = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-    <Response>
-      <Connect>
-        <Stream url=\"wss://${host}/media-stream?persona=${personaKey}\" />
-      </Connect>
-    </Response>`;
+  const streamUrl = `wss://${host}/media-stream?persona=${personaKey}`;
+  const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+  <Response>
+    <Connect>
+      <Stream url="${streamUrl.replace(/&/g, '&amp;')}" />
+    </Connect>
+  </Response>`;
 
   reply.type("text/xml").send(twimlResponse);
 });
+
 
 fastify.register(async (fastify) => {
   fastify.get("/media-stream", { websocket: true }, (connection, req) => {
