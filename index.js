@@ -71,8 +71,8 @@ fastify.all("/incoming-call", async (request, reply) => {
     console.log("Incoming call");
 
     //const personaKey = queryParams.persona || "genZ";
-    const personaKey = "shaggy";
-    
+    const personaKey = "texanDude";
+
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
     <Response>
         <Connect>
@@ -92,7 +92,7 @@ fastify.register(async (fastify) => {
     // 1. Extract personaKey from WebSocket query string
     const queryParams = querystring.parse(req.url.split("?")[1]);
     //const personaKey = queryParams.persona || "genZ";
-    const personaKey = "shaggy";
+    const personaKey = "texanDude";
 
     console.log("Parsed personaKey from querystring:", personaKey);
 
