@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import fastifyFormBody from "@fastify/formbody";
 import fastifyWs from "@fastify/websocket";
 import fetch from "node-fetch";
+import querystring from "node:querystring";
+
 import { PERSONAS } from "./config/variables.js"; 
 
 // Load environment variables from .env file
@@ -84,7 +86,8 @@ fastify.register(async (fastify) => {
     fastify.get("/media-stream", { websocket: true }, (connection, req) => {
         console.log("Client connected");
 
-        const personaKey = new URL(req.url, `http://${req.headers.host}`).searchParams.get("persona") || "genZ";
+        const queryParams = querystring.parse(req.url.split("?")[1]);
+        const personaKey = queryParams.persona || "genZ";
         const selectedPersona = PERSONAS[personaKey] || PERSONAS["genZ"];
 
         console.log("🧠 Selected Persona:", personaKey);
