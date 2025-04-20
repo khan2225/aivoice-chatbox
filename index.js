@@ -316,6 +316,38 @@ connection.on("close", async () => {
          });
      });
  });
+
+
+
+//new routes added here
+fastify.post("/api/v1/app/pull-call", async (req, reply) => {
+    reply.send({ user: "1" });
+});
+
+fastify.post("/api/v1/app/pull-pref", async (req, reply) => {
+    const { ownedBy } = req.body;
+
+    // Simulate a user-to-personaKey mapping (in real life, pull from DB)
+    const userPersonaMap = {
+        "1": "texanDude",
+        "2": "genZ",
+        "3": "shaggy",
+        "4": "jackSparrow"
+    };
+
+    const personaKey = userPersonaMap[ownedBy] || "genZ";
+    const persona = PERSONAS[personaKey];
+
+    reply.send({
+        status: "success",
+        result: {
+            voice: persona.voice,
+            prompt: persona.systemMessage.trim()
+        }
+    });
+});
+
+
  
  fastify.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
      if (err) {
