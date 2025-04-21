@@ -132,7 +132,7 @@ import Fastify from "fastify";
                 ? Object.keys(PERSONAS).find(p => PERSONAS[p].systemMessage.includes(prompt)) || "genZ"
                 : "genZ";
         
-            // ✅ Lock persona + update session
+            // Lock persona + update session
             selectedPersona = PERSONAS[personaKey];
             session.userId = userId;
             session.personaKey = personaKey;
@@ -218,21 +218,28 @@ import Fastify from "fastify";
                  }
  
                  if (
-                     response.type === "response.audio.delta" &&
-                     response.delta
-                 ) {
-                     const audioDelta = {
-                         event: "media",
-                         streamSid: session.streamSid,
-                         media: {
-                             payload: Buffer.from(
-                                 response.delta,
-                                 "base64",
-                             ).toString("base64"),
-                         },
-                     };
-                     connection.send(JSON.stringify(audioDelta));
-                 }
+                    response.type === "response.audio.delta" &&
+                    response.delta &&
+                    session.streamSid // Confirm it's initialized
+                  ) {
+                    const audioDelta = {
+                      event: "media",
+                      streamSid: session.streamSid,
+                      media: {
+                        payload: Buffer.from(response.delta, "base64").toString("base64"),
+                      },
+                    };
+                  
+                    console.log("Sending to Twilio:", JSON.stringify(audioDelta)); // helpful for debug
+                  
+                    connection.send(JSON.stringify(audioDelta));
+                  } else if (
+                    response.type === "response.audio.delta" &&
+                    !session.streamSid
+                  ) {
+                    console.warn("Tried to send audio before streamSid was set. Skipping...");
+                  }
+                  
              } catch (error) {
                  console.error(
                      "Error processing OpenAI message:",
