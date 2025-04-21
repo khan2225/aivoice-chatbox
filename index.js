@@ -111,10 +111,7 @@ import Fastify from "fastify";
          };
          sessions.set(sessionId, session);
          
-         let selectedPersona = {
-             systemMessage: PERSONAS.genZ.systemMessage,
-             voice: PERSONAS.genZ.voice,
-         };
+         let selectedPersona = PERSONAS.genZ;
          
          try {
             const userId = await fetchUserFromCallStack();
@@ -125,15 +122,10 @@ import Fastify from "fastify";
             });
         
             const prefData = await prefResponse.json();
-            const prompt = prefData.result?.prompt;
-        
-            // Match personaKey using prompt
-            const personaKey = prompt
-                ? Object.keys(PERSONAS).find(p => PERSONAS[p].systemMessage.includes(prompt)) || "genZ"
-                : "genZ";
-        
-            // Lock persona + update session
+            const personaKey = prefData.result?.personaKey || "genZ";
             selectedPersona = PERSONAS[personaKey];
+
+            // Lock persona + update session
             session.userId = userId;
             session.personaKey = personaKey;
         
@@ -157,27 +149,30 @@ import Fastify from "fastify";
          },
      });
  
+     console.log("Preparing to send voice config:", selectedPersona);
+
      // 5. Send session update when connected
      const sendSessionUpdate = () => {
-         const sessionUpdate = {
-             type: "session.update",
-             session: {
-                 turn_detection: { type: "server_vad" },
-                 input_audio_format: "g711_ulaw",
-                 output_audio_format: "g711_ulaw",
-                 voice: selectedPersona.voice,
-                 instructions: selectedPersona.systemMessage,
-                 modalities: ["text", "audio"],
-                 temperature: 0.8,
-                 input_audio_transcription: {
-                     model: "whisper-1",
-                 },
-             },
-         };
- 
-         console.log("Sending session update to OpenAI:", JSON.stringify(sessionUpdate, null, 2));
-         openAiWs.send(JSON.stringify(sessionUpdate));
-     };
+        console.log(">> Sending session update with voice:", selectedPersona.voice);
+        const sessionUpdate = {
+            type: "session.update",
+            session: {
+                turn_detection: { type: "server_vad" },
+                input_audio_format: "g711_ulaw",
+                output_audio_format: "g711_ulaw",
+                voice: selectedPersona.voice || "alloy",  // fallback for safety
+                instructions: selectedPersona.systemMessage,
+                modalities: ["text", "audio"],
+                temperature: 0.8,
+                input_audio_transcription: {
+                    model: "whisper-1",
+                },
+            },
+        };
+        openAiWs.send(JSON.stringify(sessionUpdate));
+    };
+    
+    
  
      openAiWs.on("open", () => {
          console.log("Connected to the OpenAI Realtime API");
@@ -356,7 +351,8 @@ fastify.post("/api/v1/app/pull-pref", async (req, reply) => {
         status: "success",
         result: {
             voice: persona.voice,
-            prompt: persona.systemMessage.trim()
+            prompt: persona.systemMessage.trim(),
+            personaKey,
         }
     });
 });
