@@ -41,7 +41,8 @@ import Fastify from "fastify";
   `;
   
   const VOICE = "alloy"; */
-  const PORT = process.env.PORT;
+  const PORT = process.env.PORT || 8080;
+
   const WEBHOOK_URL =
       "https://hook.us2.make.com/7erbor5aii151b4crb2geajhlnozbkvd";
  
