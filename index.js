@@ -91,28 +91,32 @@ fastify.register(async (fastify) => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ownedBy: userId }),
             });
+        
             const prefData = await prefResponse.json();
-            const voice = prefData.result?.voice;
-            const prompt = prefData.result?.prompt;
-
-            selectedPersona = {
-                systemMessage: prompt || PERSONAS.genZ.systemMessage,
-                voice: voice || PERSONAS.genZ.voice,
-            };
-
+            const { voice, prompt, personaKey } = prefData.result || {};
+        
+            console.log("Fetched persona data:", { userId, personaKey, voice, prompt });
+        
+            if (PERSONAS[personaKey]) {
+                selectedPersona = PERSONAS[personaKey];
+                session.personaKey = personaKey;
+            } else {
+                console.warn("Invalid or missing personaKey, defaulting to genZ");
+                selectedPersona = PERSONAS.genZ;
+                session.personaKey = "genZ";
+            }
+        
             session.userId = userId;
-            session.personaKey = prompt
-                ? Object.keys(PERSONAS).find(p => PERSONAS[p].systemMessage.includes(prompt)) || "genZ"
-                : "genZ";
-
-            console.log(`User ID: ${userId}, Persona: ${session.personaKey}`);
+            console.log(" Final persona:", session.personaKey);
+            console.log(" Using voice:", selectedPersona.voice);
+            console.log(" Prompt preview:", selectedPersona.systemMessage.substring(0, 60) + "...");
         } catch (err) {
-            console.warn("Failed to fetch persona prefs. Using defaults.", err);
+            console.warn(" Failed to fetch persona prefs. Using default.", err);
+            selectedPersona = PERSONAS.genZ;
+            session.personaKey = "genZ";
         }
-
-        console.log("Selected Persona:", session.personaKey);
-        console.log("Voice:", selectedPersona.voice);
-        console.log("Prompt (preview):", selectedPersona.systemMessage.substring(0, 60) + "...");
+        
+ 
 
         const openAiWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", {
             headers: {
