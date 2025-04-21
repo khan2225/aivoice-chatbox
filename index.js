@@ -147,6 +147,8 @@ import Fastify from "fastify";
          console.log("Voice:", selectedPersona.voice);
          console.log("Prompt (preview):", selectedPersona.systemMessage.substring(0, 60) + "...");
          
+         let pendingAudioChunks = [];
+
      // 4. Connect to OpenAI
      const openAiWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", {
          headers: {
@@ -217,28 +219,23 @@ import Fastify from "fastify";
                      console.log("Session updated successfully:", response);
                  }
  
-                 if (
-                    response.type === "response.audio.delta" &&
-                    response.delta &&
-                    session.streamSid // Confirm it's initialized
-                  ) {
-                    const audioDelta = {
-                      event: "media",
-                      streamSid: session.streamSid,
-                      media: {
-                        payload: Buffer.from(response.delta, "base64").toString("base64"),
-                      },
-                    };
+                 if (response.type === "response.audio.delta" && response.delta) {
+                    const payload = Buffer.from(response.delta, "base64").toString("base64");
                   
-                    console.log("Sending to Twilio:", JSON.stringify(audioDelta)); // helpful for debug
-                  
-                    connection.send(JSON.stringify(audioDelta));
-                  } else if (
-                    response.type === "response.audio.delta" &&
-                    !session.streamSid
-                  ) {
-                    console.warn("Tried to send audio before streamSid was set. Skipping...");
+                    if (session.streamSid) {
+                      const audioDelta = {
+                        event: "media",
+                        streamSid: session.streamSid,
+                        media: { payload },
+                      };
+                      console.log("Sending to Twilio:", JSON.stringify(audioDelta));
+                      connection.send(JSON.stringify(audioDelta));
+                    } else {
+                      console.warn("Buffering audio delta until streamSid is ready...");
+                      pendingAudioChunks.push(payload);
+                    }
                   }
+                  
                   
              } catch (error) {
                  console.error(
@@ -251,40 +248,53 @@ import Fastify from "fastify";
          });
  
          // Handle incoming messages from Twilio
+         let sessionUpdateSent = false;
          connection.on("message", (message) => {
              try {
                  const data = JSON.parse(message);
                  switch (data.event) {
                      case "media":
+                         if (!sessionUpdateSent && openAiWs.readyState === WebSocket.OPEN) {
+                             sendSessionUpdate();  // defer session start until audio starts
+                             sessionUpdateSent = true;
+                         }
+         
                          if (openAiWs.readyState === WebSocket.OPEN) {
                              const audioAppend = {
                                  type: "input_audio_buffer.append",
                                  audio: data.media.payload,
                              };
- 
                              openAiWs.send(JSON.stringify(audioAppend));
                          }
                          break;
+         
                      case "start":
                          session.streamSid = data.start.streamSid;
-                         console.log(
-                             "Incoming stream has started",
-                             session.streamSid,
-                         );
+                         console.log("Incoming stream has started", session.streamSid);
+         
+                         // Flush pending audio
+                         pendingAudioChunks.forEach((payload) => {
+                             const audioDelta = {
+                                 event: "media",
+                                 streamSid: session.streamSid,
+                                 media: { payload },
+                             };
+                             if (connection.socket.readyState === WebSocket.OPEN) {
+                                 connection.send(JSON.stringify(audioDelta));
+                             }
+                         });
+                         pendingAudioChunks = [];
                          break;
+         
                      default:
                          console.log("Received non-media event:", data.event);
                          break;
                  }
              } catch (error) {
-                 console.error(
-                     "Error parsing message:",
-                     error,
-                     "Message:",
-                     message,
-                 );
+                 console.error("Error parsing message:", error, "Message:", message);
              }
          });
+         
  
          // Handle connection close and log transcript
 connection.on("close", async () => {
