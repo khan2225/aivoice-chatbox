@@ -315,7 +315,7 @@ openAiWs.on("error", (error) => {
     console.error("Error in the OpenAI WebSocket:", error);
 });
 });
-});
+
 
 fastify.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
 if (err) {
