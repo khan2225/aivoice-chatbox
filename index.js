@@ -174,10 +174,10 @@ import Fastify from "fastify";
     
     
  
-     openAiWs.on("open", () => {
-         console.log("Connected to the OpenAI Realtime API");
-         setTimeout(sendSessionUpdate, 250); // slight delay for stability
-     });
+    openAiWs.on("open", () => {
+        console.log("Connected to OpenAI");
+        setTimeout(sendSessionUpdate, 250);
+    });
  
  
          // Listen for messages from the OpenAI WebSocket
@@ -215,22 +215,20 @@ import Fastify from "fastify";
                  }
  
                  if (response.type === "response.audio.delta" && response.delta) {
-                    const payload = Buffer.from(response.delta, "base64").toString("base64");
-                  
-                    if (session.streamSid) {
-                      const audioDelta = {
-                        event: "media",
-                        streamSid: session.streamSid,
-                        media: { payload },
-                      };
-                      console.log("Sending to Twilio:", JSON.stringify(audioDelta));
-                      connection.send(JSON.stringify(audioDelta));
+                    const payload = response.delta; // already base64
+                
+                    if (session.streamSid && connection.socket.readyState === WebSocket.OPEN) {
+                        const audioDelta = {
+                            event: "media",
+                            streamSid: session.streamSid,
+                            media: { payload },
+                        };
+                        connection.send(JSON.stringify(audioDelta));
                     } else {
-                      console.warn("Buffering audio delta until streamSid is ready...");
-                      pendingAudioChunks.push(payload);
+                        console.warn("Buffering audio delta until streamSid is ready...");
+                        pendingAudioChunks.push(payload);
                     }
-                  }
-                  
+                }
                   
              } catch (error) {
                  console.error(
@@ -249,11 +247,6 @@ import Fastify from "fastify";
                  const data = JSON.parse(message);
                  switch (data.event) {
                      case "media":
-                         if (!sessionUpdateSent && openAiWs.readyState === WebSocket.OPEN) {
-                             sendSessionUpdate();  // defer session start until audio starts
-                             sessionUpdateSent = true;
-                         }
-         
                          if (openAiWs.readyState === WebSocket.OPEN) {
                              const audioAppend = {
                                  type: "input_audio_buffer.append",
