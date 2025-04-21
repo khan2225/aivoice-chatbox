@@ -66,17 +66,34 @@ import Fastify from "fastify";
       reply.send({ message: "Twilio Media Stream Server is running!" });
   });
  
+  async function fetchUserFromCallStack() {
+     try {
+         const response = await fetch("https://scam-scam-service-185231488037.us-central1.run.app/api/v1/app/pull-call", {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify({}),
+         });
+ 
+         const data = await response.json();
+         return data.user || "1"; // fallback if needed
+     } catch (err) {
+         console.error("Failed to fetch user from call stack:", err);
+         return "1"; // fallback for testing
+     }
+ }
+ 
+ 
   // Route for Twilio to handle incoming and outgoing calls
   fastify.all("/incoming-call", async (request, reply) => {
       console.log("Incoming call");
  
       //const personaKey = queryParams.persona || "genZ";
-      const personaKey = "texanDude";
+      //const personaKey = "texanDude";
  
       const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
       <Response>
           <Connect>
-              <Stream url="wss://${request.headers.host}/media-stream?persona=${personaKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" />
+              <Stream url="wss://${request.headers.host}/media-stream" />
           </Connect>
       </Response>`;
  
@@ -86,32 +103,52 @@ import Fastify from "fastify";
  
   // WebSocket route for media-stream
   fastify.register(async (fastify) => {
-      fastify.get("/media-stream", { websocket: true }, (connection, req) => {
+      fastify.get("/media-stream", { websocket: true }, async (connection, req) => {
           console.log("Client connected");
  
-      // 1. Extract personaKey from WebSocket query string
-      const queryParams = querystring.parse(req.url.split("?")[1]);
-      //const personaKey = queryParams.persona || "genZ";
-      const personaKey = "texanDude";
+          const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
+          let session = sessions.get(sessionId) || {
+              transcript: "",
+              streamSid: null,
+              callStart: new Date().toISOString(),
+          };
+          sessions.set(sessionId, session);
  
-      console.log("Parsed personaKey from querystring:", personaKey);
+          let selectedPersona = {
+              systemMessage: PERSONAS.genZ.systemMessage,
+              voice: PERSONAS.genZ.voice,
+          };
  
-      // 2. Store session with correct personaKey
-      const sessionId = req.headers["x-twilio-call-sid"] || `session_${Date.now()}`;
-      let session = sessions.get(sessionId) || {
-          transcript: "",
-          streamSid: null,
-          callStart: new Date().toISOString(),
-      };
-      session.personaKey = personaKey;
-      sessions.set(sessionId, session);
-      console.log("Final session object:", session);
+          try {
+              const userId = await fetchUserFromCallStack();
+              const prefResponse = await fetch("https://scam-scam-service-185231488037.us-central1.run.app/api/v1/app/pull-pref", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ownedBy: userId }),
+              });
+              const prefData = await prefResponse.json();
  
-      // 3. Load selected persona AFTER session.personaKey is stored
-      const selectedPersona = PERSONAS[session.personaKey] || PERSONAS["genZ"];
-      console.log("Selected Persona:", session.personaKey);
-      console.log("Voice:", selectedPersona.voice);
-      console.log("Prompt (preview):", selectedPersona.systemMessage.substring(0, 60) + "...");
+              const voice = prefData.result?.voice;
+              const prompt = prefData.result?.prompt;
+ 
+              selectedPersona = {
+                  systemMessage: prompt || PERSONAS.genZ.systemMessage,
+                  voice: voice || PERSONAS.genZ.voice,
+              };
+ 
+              session.userId = userId;
+              session.personaKey = prompt
+                  ? Object.keys(PERSONAS).find(p => PERSONAS[p].systemMessage.includes(prompt)) || "genZ"
+                  : "genZ";
+ 
+              console.log(`User ID: ${userId}, Persona: ${session.personaKey}`);
+          } catch (err) {
+              console.warn("Failed to fetch persona prefs. Using defaults.", err);
+          }
+ 
+          console.log("Selected Persona:", session.personaKey);
+          console.log("Voice:", selectedPersona.voice);
+          console.log("Prompt (preview):", selectedPersona.systemMessage.substring(0, 60) + "...");
  
       // 4. Connect to OpenAI
       const openAiWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", {
@@ -280,6 +317,38 @@ import Fastify from "fastify";
       });
   });
  
+ 
+ 
+ //new routes added here
+ fastify.post("/api/v1/app/pull-call", async (req, reply) => {
+     reply.send({ user: "1" });
+ });
+ 
+ fastify.post("/api/v1/app/pull-pref", async (req, reply) => {
+     const { ownedBy } = req.body;
+ 
+     // Simulate a user-to-personaKey mapping (in real life, pull from DB)
+     const userPersonaMap = {
+         "1": "texanDude",
+         "2": "genZ",
+         "3": "shaggy",
+         "4": "jackSparrow"
+     };
+ 
+     const personaKey = userPersonaMap[ownedBy] || "genZ";
+     const persona = PERSONAS[personaKey];
+ 
+     reply.send({
+         status: "success",
+         result: {
+             voice: persona.voice,
+             prompt: persona.systemMessage.trim()
+         }
+     });
+ });
+ 
+ 
+ 
   fastify.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
       if (err) {
           console.error(err);
@@ -424,3 +493,4 @@ import Fastify from "fastify";
       } catch (error) {
           console.error("Error in processTranscriptAndSend:", error);
       }
+}
