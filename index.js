@@ -117,31 +117,31 @@ import Fastify from "fastify";
          };
          
          try {
-             const userId = await fetchUserFromCallStack();
-             const prefResponse = await fetch("https://scam-scam-service-185231488037.us-central1.run.app/api/v1/app/pull-pref", {
-                 method: "POST",
-                 headers: { "Content-Type": "application/json" },
-                 body: JSON.stringify({ ownedBy: userId }),
-             });
-             const prefData = await prefResponse.json();
-             
-             const voice = prefData.result?.voice;
-             const prompt = prefData.result?.prompt;
-         
-             selectedPersona = {
-                 systemMessage: prompt || PERSONAS.genZ.systemMessage,
-                 voice: voice || PERSONAS.genZ.voice,
-             };
-         
-             session.userId = userId;
-             session.personaKey = prompt
-                 ? Object.keys(PERSONAS).find(p => PERSONAS[p].systemMessage.includes(prompt)) || "genZ"
-                 : "genZ";
-         
-             console.log(`User ID: ${userId}, Persona: ${session.personaKey}`);
-         } catch (err) {
-             console.warn("Failed to fetch persona prefs. Using defaults.", err);
-         }
+            const userId = await fetchUserFromCallStack();
+            const prefResponse = await fetch("https://scam-scam-service-185231488037.us-central1.run.app/api/v1/app/pull-pref", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ownedBy: userId }),
+            });
+        
+            const prefData = await prefResponse.json();
+            const prompt = prefData.result?.prompt;
+        
+            // Match personaKey using prompt
+            const personaKey = prompt
+                ? Object.keys(PERSONAS).find(p => PERSONAS[p].systemMessage.includes(prompt)) || "genZ"
+                : "genZ";
+        
+            // ✅ Lock persona + update session
+            selectedPersona = PERSONAS[personaKey];
+            session.userId = userId;
+            session.personaKey = personaKey;
+        
+            console.log(`User ID: ${userId}, Persona: ${personaKey}`);
+        } catch (err) {
+            console.warn("Failed to fetch persona prefs. Using defaults.", err);
+        }
+        
          
          console.log("Selected Persona:", session.personaKey);
          console.log("Voice:", selectedPersona.voice);
