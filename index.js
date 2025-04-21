@@ -86,14 +86,11 @@ import Fastify from "fastify";
  // Route for Twilio to handle incoming and outgoing calls
  fastify.all("/incoming-call", async (request, reply) => {
      console.log("Incoming call");
- 
-     //const personaKey = queryParams.persona || "genZ";
-     //const personaKey = "texanDude";
- 
+
      const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
      <Response>
          <Connect>
-             <Stream url="wss://${request.headers.host}/media-stream" />
+            <Stream url="wss://${request.headers.host}/media-stream" />
          </Connect>
      </Response>`;
  
