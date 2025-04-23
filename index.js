@@ -30,7 +30,7 @@ fastify.get("/test", { websocket: true }, (connection) => {
   });
 });
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 5050;
 const WEBHOOK_URL =
   "https://hook.us2.make.com/7erbor5aii151b4crb2geajhlnozbkvd";
 const sessions = new Map();
@@ -51,21 +51,22 @@ fastify.get("/", async (request, reply) => {
   reply.send({ message: "Twilio Media Stream Server is running!" });
 });
 
-async function fetchUserFromCallStack() {
+async function fetchUserFromCallStack(userId) {
   try {
     const response = await fetch(
       "https://scam-scam-service-185231488037.us-central1.run.app/api/v1/app/pull-call",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ user: userId }),
       },
     );
     const data = await response.json();
-    return data.user || "1";
+    console.log("pull-call response:", data);
+    return data.result?.ownedBy || userId;
   } catch (err) {
     console.error("Failed to fetch user from call stack:", err);
-    return "1";
+    return userId;
   }
 }
 
@@ -81,11 +82,14 @@ async function fetchUserPreferences(userId) {
     );
 
     const data = await response.json();
+    console.log("User preferences pulled for", userId, "=>", data);
     return data.result || {};
+    
   } catch (err) {
     console.error("Failed to fetch user preferences:", err);
     return {};
   }
+  
 }
 
 /*fastify.all("/incoming-call", async (request, reply) => {
@@ -98,7 +102,6 @@ async function fetchUserPreferences(userId) {
 
   reply.type("text/xml").send(twimlResponse);
 });*/
-
 
 fastify.all("/incoming-call", async (request, reply) => {
   const host = request.headers.host; // Get current domain
@@ -127,9 +130,6 @@ fastify.all("/incoming-call", async (request, reply) => {
   console.log("Twilio WebSocket connected to /incoming-call");
 });
 
-
-
-
 fastify.register(async (fastify) => {
   fastify.get("/media-stream", { websocket: true }, (connection, req) => {
     console.log("Client connected");
@@ -149,7 +149,6 @@ fastify.register(async (fastify) => {
     }
 
     console.log("Pulled session.phoneNumber:", session.phoneNumber);
-
 
     // Immediately listen for Twilio events
     connection.on("message", (msg) => {
@@ -183,7 +182,7 @@ fastify.register(async (fastify) => {
     // Determine which persona to use, then setup OpenAI
     fetchUserFromCallStack().then(async (userId) => {
       const prefs = await fetchUserPreferences(userId);
-      const personaKey = prefs.prompt || "genZ";
+      const personaKey = prefs.prompt || prefs.voice || "genZ";
       const selectedPersona = PERSONAS[personaKey] || PERSONAS.genZ;
 
       console.log("Fetched prompt:", prefs.prompt);
@@ -194,9 +193,11 @@ fastify.register(async (fastify) => {
       session.voice = selectedPersona.voice;
 
       const userPhone = req.query?.From || "unknown"; //phonenumber
-      session.phoneNumber = userPhone;  
+      session.phoneNumber = userPhone;
 
-      console.log(`User ID: ${userId}, Persona: ${personaKey}, Phone: ${userPhone}`);
+      console.log(
+        `User ID: ${userId}, Persona: ${personaKey}, Phone: ${userPhone}`,
+      );
       setupOpenAI(connection, sessionId, session, selectedPersona);
     });
 
@@ -388,4 +389,4 @@ async function processTranscriptAndSend(transcript, sessionId) {
   } catch (err) {
     console.error("Error processing transcript:", err);
   }
-} 
+}
