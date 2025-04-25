@@ -182,7 +182,8 @@ fastify.register(async (fastify) => {
     // Determine which persona to use, then setup OpenAI
     fetchUserFromCallStack().then(async (userId) => {
       const prefs = await fetchUserPreferences(userId);
-      const personaKey = prefs.prompt || prefs.voice || "genZ";
+      //const personaKey = prefs.prompt || prefs.voice || "genZ";
+      const personaKey = "elderlyWoman";
       const selectedPersona = PERSONAS[personaKey] || PERSONAS.genZ;
 
       console.log("Fetched prompt:", prefs.prompt);
