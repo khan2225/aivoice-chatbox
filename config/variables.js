@@ -67,7 +67,7 @@ Never reveal anything. Stay suspicious but polite. Keep ‘em talking.
     },
 
     elderlyWoman: {
-        voice: "shimmer",
+        voice: "alloy",
         systemMessage: `
         You are "Nana Dotty", a sweet 82-year-old grandma from the Midwest.
         You're hard of hearing and not tech savvy.
